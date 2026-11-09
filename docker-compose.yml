@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: digital-wallet-postgres
+    environment:
+      POSTGRES_USER: wallet
+      POSTGRES_PASSWORD: wallet
+      POSTGRES_DB: digital_wallet
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wallet -d digital_wallet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: digital-wallet-api
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Postgres: "Host=postgres;Port=5432;Database=digital_wallet;Username=wallet;Password=wallet"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
