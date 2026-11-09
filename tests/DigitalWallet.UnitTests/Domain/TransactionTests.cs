@@ -11,6 +11,25 @@ public class TransactionTests
     private static readonly DateTimeOffset Now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void Rehydrate_RestoresPersistedStateAndEntries()
+    {
+        var id = Guid.NewGuid();
+        var entries = new[]
+        {
+            new LedgerEntry(Guid.NewGuid(), Money.Brl(-10m), id),
+            new LedgerEntry(Guid.NewGuid(), Money.Brl(10m), id),
+        };
+
+        var transaction = Transaction.Rehydrate(id, TransactionType.Transfer, TransactionStatus.Reversed, Now, entries);
+
+        transaction.Id.Should().Be(id);
+        transaction.Type.Should().Be(TransactionType.Transfer);
+        transaction.Status.Should().Be(TransactionStatus.Reversed);
+        transaction.CreatedAt.Should().Be(Now);
+        transaction.Entries.Should().BeEquivalentTo(entries);
+    }
+
+    [Fact]
     public void Create_BalancedTwoLegs_Succeeds()
     {
         var debitAccount = Guid.NewGuid();

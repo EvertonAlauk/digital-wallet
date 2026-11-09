@@ -19,6 +19,12 @@ public sealed class Account
         Version = 0;
     }
 
+    // Used by EF Core to materialize entities. Values are set by the persistence mapping.
+    private Account()
+    {
+        Balance = Money.Zero();
+    }
+
     public Guid Id { get; }
 
     public Guid OwnerId { get; }
@@ -35,9 +41,43 @@ public sealed class Account
     public static Account Open(Guid id, Guid ownerId, DateTimeOffset createdAt) =>
         new(id, ownerId, createdAt);
 
-    public void Block() => Status = AccountStatus.Blocked;
+    /// <summary>
+    /// Restores an account from persisted state. Does not validate business rules, because the
+    /// state was already validated when it was written.
+    /// </summary>
+    public static Account Rehydrate(
+        Guid id,
+        Guid ownerId,
+        Money balance,
+        AccountStatus status,
+        int version,
+        DateTimeOffset createdAt)
+    {
+        var account = new Account(id, ownerId, createdAt)
+        {
+            Balance = balance,
+            Status = status,
+            Version = version,
+        };
 
-    public void Unblock() => Status = AccountStatus.Active;
+        return account;
+    }
+
+    /// <summary>Blocks the account. Changing the status is a state change, so it increments <see cref="Version"/>.</summary>
+    public void Block() => ChangeStatus(AccountStatus.Blocked);
+
+    public void Unblock() => ChangeStatus(AccountStatus.Active);
+
+    private void ChangeStatus(AccountStatus newStatus)
+    {
+        if (Status == newStatus)
+        {
+            return;
+        }
+
+        Status = newStatus;
+        Version++;
+    }
 
     /// <summary>
     /// Applies a ledger entry to the balance. A blocked account cannot move funds, and the balance never becomes negative.

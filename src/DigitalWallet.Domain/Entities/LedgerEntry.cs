@@ -21,6 +21,12 @@ public sealed record LedgerEntry
         TransactionId = transactionId;
     }
 
+    // Used by EF Core to materialize entities. Values are set by the persistence mapping.
+    private LedgerEntry()
+    {
+        Amount = Money.Zero();
+    }
+
     public Guid AccountId { get; }
 
     public Money Amount { get; }

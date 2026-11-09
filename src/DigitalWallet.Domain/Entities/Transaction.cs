@@ -21,6 +21,12 @@ public sealed class Transaction
         _entries = entries;
     }
 
+    // Used by EF Core to materialize entities. Values are set by the persistence mapping.
+    private Transaction()
+    {
+        _entries = new List<LedgerEntry>();
+    }
+
     public Guid Id { get; }
 
     public TransactionType Type { get; }
@@ -30,6 +36,25 @@ public sealed class Transaction
     public DateTimeOffset CreatedAt { get; }
 
     public IReadOnlyList<LedgerEntry> Entries => _entries;
+
+    /// <summary>
+    /// Restores a transaction from persisted state. Does not re-validate the entries, because they
+    /// were validated when the transaction was created.
+    /// </summary>
+    public static Transaction Rehydrate(
+        Guid id,
+        TransactionType type,
+        TransactionStatus status,
+        DateTimeOffset createdAt,
+        IEnumerable<LedgerEntry> entries)
+    {
+        var transaction = new Transaction(id, type, createdAt, entries.ToList())
+        {
+            Status = status,
+        };
+
+        return transaction;
+    }
 
     /// <summary>
     /// Creates a transaction from legs (account, signed amount).

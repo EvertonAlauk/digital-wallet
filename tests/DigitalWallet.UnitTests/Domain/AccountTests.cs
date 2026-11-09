@@ -107,6 +107,46 @@ public class AccountTests
     }
 
     [Fact]
+    public void Block_ChangesStatusAndIncrementsVersion()
+    {
+        var account = OpenAccount();
+        var versionBefore = account.Version;
+
+        account.Block();
+
+        account.Status.Should().Be(AccountStatus.Blocked);
+        account.Version.Should().Be(versionBefore + 1);
+    }
+
+    [Fact]
+    public void Block_WhenAlreadyBlocked_DoesNotChangeVersion()
+    {
+        var account = OpenAccount();
+        account.Block();
+        var versionBefore = account.Version;
+
+        account.Block();
+
+        account.Version.Should().Be(versionBefore);
+    }
+
+    [Fact]
+    public void Rehydrate_RestoresPersistedState()
+    {
+        var id = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+
+        var account = Account.Rehydrate(id, ownerId, Money.Brl(42m), AccountStatus.Blocked, 7, Now);
+
+        account.Id.Should().Be(id);
+        account.OwnerId.Should().Be(ownerId);
+        account.Balance.Should().Be(Money.Brl(42m));
+        account.Status.Should().Be(AccountStatus.Blocked);
+        account.Version.Should().Be(7);
+        account.CreatedAt.Should().Be(Now);
+    }
+
+    [Fact]
     public void Unblock_AllowsMovementsAgain()
     {
         var account = OpenAccount();
