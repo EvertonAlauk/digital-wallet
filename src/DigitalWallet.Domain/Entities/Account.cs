@@ -6,14 +6,17 @@ namespace DigitalWallet.Domain.Entities;
 
 /// <summary>
 /// Account of a holder. The balance is a cache of the ledger entries and changes only via <see cref="ApplyEntry"/>.
+/// Customer accounts never go negative. Settlement accounts represent money held outside the wallet
+/// (the counterpart of deposits and withdrawals), so their balance is allowed to be negative.
 /// </summary>
 public sealed class Account
 {
-    private Account(Guid id, Guid ownerId, DateTimeOffset createdAt)
+    private Account(Guid id, Guid ownerId, DateTimeOffset createdAt, AccountKind kind)
     {
         Id = id;
         OwnerId = ownerId;
         CreatedAt = createdAt;
+        Kind = kind;
         Balance = Money.Zero();
         Status = AccountStatus.Active;
         Version = 0;
@@ -29,17 +32,23 @@ public sealed class Account
 
     public Guid OwnerId { get; }
 
+    public AccountKind Kind { get; }
+
     public Money Balance { get; private set; }
 
     public AccountStatus Status { get; private set; }
 
-    /// <summary>Optimistic concurrency token. Incremented on every movement.</summary>
+    /// <summary>Optimistic concurrency token. Incremented on every movement and status change.</summary>
     public int Version { get; private set; }
 
     public DateTimeOffset CreatedAt { get; }
 
     public static Account Open(Guid id, Guid ownerId, DateTimeOffset createdAt) =>
-        new(id, ownerId, createdAt);
+        new(id, ownerId, createdAt, AccountKind.Customer);
+
+    /// <summary>Opens the settlement account that is the counterpart of deposits and withdrawals.</summary>
+    public static Account OpenSettlement(Guid id, DateTimeOffset createdAt) =>
+        new(id, Guid.Empty, createdAt, AccountKind.Settlement);
 
     /// <summary>
     /// Restores an account from persisted state. Does not validate business rules, because the
@@ -51,9 +60,10 @@ public sealed class Account
         Money balance,
         AccountStatus status,
         int version,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        AccountKind kind = AccountKind.Customer)
     {
-        var account = new Account(id, ownerId, createdAt)
+        var account = new Account(id, ownerId, createdAt, kind)
         {
             Balance = balance,
             Status = status,
@@ -80,7 +90,8 @@ public sealed class Account
     }
 
     /// <summary>
-    /// Applies a ledger entry to the balance. A blocked account cannot move funds, and the balance never becomes negative.
+    /// Applies a ledger entry to the balance. A blocked account cannot move funds. A customer account
+    /// cannot go negative; a settlement account can.
     /// </summary>
     public void ApplyEntry(LedgerEntry entry)
     {
@@ -99,7 +110,7 @@ public sealed class Account
 
         var newBalance = Balance.Add(entry.Amount);
 
-        if (newBalance.Amount < 0m)
+        if (Kind == AccountKind.Customer && newBalance.Amount < 0m)
         {
             throw new InsufficientFundsException(Id, Balance.Amount, -entry.Amount.Amount);
         }

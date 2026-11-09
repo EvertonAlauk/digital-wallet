@@ -126,6 +126,52 @@ public sealed class Transaction
     }
 
     /// <summary>
+    /// Deposit: money enters the customer account and leaves the settlement account.
+    /// </summary>
+    public static Transaction Deposit(
+        Guid id,
+        Guid customerAccountId,
+        Guid settlementAccountId,
+        Money amount,
+        DateTimeOffset createdAt)
+    {
+        amount.EnsurePositive();
+
+        return Create(
+            id,
+            TransactionType.Deposit,
+            createdAt,
+            new[]
+            {
+                (customerAccountId, amount),
+                (settlementAccountId, amount.Negate()),
+            });
+    }
+
+    /// <summary>
+    /// Withdrawal: money leaves the customer account and returns to the settlement account.
+    /// </summary>
+    public static Transaction Withdrawal(
+        Guid id,
+        Guid customerAccountId,
+        Guid settlementAccountId,
+        Money amount,
+        DateTimeOffset createdAt)
+    {
+        amount.EnsurePositive();
+
+        return Create(
+            id,
+            TransactionType.Withdrawal,
+            createdAt,
+            new[]
+            {
+                (customerAccountId, amount.Negate()),
+                (settlementAccountId, amount),
+            });
+    }
+
+    /// <summary>
     /// Marks the transaction as reversed. The reversal itself is a new transaction with the entries inverted;
     /// the original entries remain intact.
     /// </summary>

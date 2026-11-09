@@ -6,6 +6,7 @@
     <Project Path="src/DigitalWallet.Infrastructure/DigitalWallet.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/DigitalWallet.IntegrationTests/DigitalWallet.IntegrationTests.csproj" />
     <Project Path="tests/DigitalWallet.Testing/DigitalWallet.Testing.csproj" />
     <Project Path="tests/DigitalWallet.UnitTests/DigitalWallet.UnitTests.csproj" />
   </Folder>

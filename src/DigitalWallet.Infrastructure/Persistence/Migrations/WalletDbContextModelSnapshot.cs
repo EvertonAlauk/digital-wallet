@@ -32,6 +32,13 @@ namespace DigitalWallet.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Customer");
+
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 

@@ -1,4 +1,5 @@
 using DigitalWallet.Domain.Entities;
+using DigitalWallet.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -13,6 +14,11 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.HasKey(account => account.Id);
 
         builder.Property(account => account.OwnerId).IsRequired();
+
+        builder.Property(account => account.Kind)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(AccountKind.Customer);
 
         builder.Property(account => account.Status)
             .HasConversion<string>()

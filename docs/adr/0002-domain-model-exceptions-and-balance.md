@@ -1,13 +1,5 @@
 # ADR 0002: Domain model, error handling, and balance as a cache
 
-- **Status:** Accepted
-- **Date:** 2026-11-09
-
-## Context
-
-The domain must enforce the non-negotiable rules in CLAUDE.md: money as `decimal`, a double-entry
-ledger as the source of truth, balance as a cache, immutable ledger entries, and a balance that can never go negative. It also needs to decide how rule violations are represented (exception or `Result`).
-
 ## Decisions
 
 ### 1. A business rule violation throws a domain exception
@@ -37,7 +29,6 @@ Invalid programming arguments (e.g. a malformed currency code) throw `ArgumentEx
 
 - `Balance` has a private setter. There is no public `Credit`/`Debit` that changes the balance without a ledger entry.
 - `ApplyEntry` validates, in this order: the entry's account, account blocked, currency, and non-negative balance. Only then does it change the balance and increment `Version`. If any validation fails, the state does not change.
-- `Version` is the optimistic concurrency token that persistence will use (CLAUDE.md).
 
 ### 4. A transaction validates its set of entries before creating them
 

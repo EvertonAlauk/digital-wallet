@@ -1,5 +1,8 @@
 using DigitalWallet.Application.Exceptions;
+using DigitalWallet.Application.Ports;
 using DigitalWallet.Domain.Entities;
+using DigitalWallet.Domain.Enums;
+using DigitalWallet.Domain.ValueObjects;
 
 namespace DigitalWallet.Testing.InMemory;
 
@@ -13,6 +16,8 @@ public sealed class InMemoryDatabase
     private readonly object _gate = new();
     private readonly Dictionary<Guid, Account> _accounts = new();
     private readonly Dictionary<Guid, Transaction> _transactions = new();
+    private readonly List<LedgerRow> _ledger = new();
+    private long _lastSequence;
 
     public InMemoryUnitOfWork CreateUnitOfWork() => new(this);
 
@@ -42,6 +47,21 @@ public sealed class InMemoryDatabase
             {
                 return _transactions.Count;
             }
+        }
+    }
+
+    /// <summary>Committed ledger entries of one account, most recent first, mirroring the statement query.</summary>
+    public IReadOnlyList<LedgerRecord> ReadAccountEntries(Guid accountId, long? beforeSequence, int limit)
+    {
+        lock (_gate)
+        {
+            return _ledger
+                .Where(row => row.AccountId == accountId)
+                .Where(row => beforeSequence is null || row.Sequence < beforeSequence)
+                .OrderByDescending(row => row.Sequence)
+                .Take(limit)
+                .Select(row => new LedgerRecord(row.Sequence, row.TransactionId, row.Type, row.Amount, row.CreatedAt))
+                .ToList();
         }
     }
 
@@ -91,12 +111,30 @@ public sealed class InMemoryDatabase
             foreach (var transaction in newTransactions)
             {
                 _transactions[transaction.Id] = Copy(transaction);
+
+                foreach (var entry in transaction.Entries)
+                {
+                    _ledger.Add(new LedgerRow(
+                        ++_lastSequence,
+                        entry.AccountId,
+                        transaction.Id,
+                        transaction.Type,
+                        entry.Amount,
+                        transaction.CreatedAt));
+                }
             }
         }
     }
 
     private static Account Copy(Account account) =>
-        Account.Rehydrate(account.Id, account.OwnerId, account.Balance, account.Status, account.Version, account.CreatedAt);
+        Account.Rehydrate(
+            account.Id,
+            account.OwnerId,
+            account.Balance,
+            account.Status,
+            account.Version,
+            account.CreatedAt,
+            account.Kind);
 
     private static Transaction Copy(Transaction transaction) =>
         Transaction.Rehydrate(
@@ -105,4 +143,13 @@ public sealed class InMemoryDatabase
             transaction.Status,
             transaction.CreatedAt,
             transaction.Entries);
+
+    // Ledger row as stored; the public LedgerRecord does not expose the account, the query filters by it.
+    private sealed record LedgerRow(
+        long Sequence,
+        Guid AccountId,
+        Guid TransactionId,
+        TransactionType Type,
+        Money Amount,
+        DateTimeOffset CreatedAt);
 }

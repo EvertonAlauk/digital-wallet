@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<ILedgerReader, LedgerReader>();
         services.AddSingleton<IClock, SystemClock>();
 
         return services;
