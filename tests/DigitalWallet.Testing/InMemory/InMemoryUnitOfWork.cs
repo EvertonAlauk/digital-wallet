@@ -1,3 +1,4 @@
+using DigitalWallet.Application.Common;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Domain.Entities;
 
@@ -6,15 +7,18 @@ namespace DigitalWallet.Testing.InMemory;
 /// <summary>
 /// Unit of work over <see cref="InMemoryDatabase"/>. Keeps one working copy per account (identity map),
 /// remembers the version each account had when it was first read, and publishes everything atomically on commit.
+/// Row locks taken by <see cref="IAccountRepository.GetByIdsForUpdateAsync"/> are held until commit or dispose.
 /// Not thread-safe by itself: each operation should use its own unit of work.
 /// </summary>
-public sealed class InMemoryUnitOfWork : IUnitOfWork
+public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
 {
     private readonly InMemoryDatabase _database;
     private readonly Dictionary<Guid, Account> _accounts = new();
     private readonly Dictionary<Guid, int> _readVersions = new();
     private readonly List<Account> _newAccounts = new();
     private readonly List<Transaction> _newTransactions = new();
+    private readonly List<SemaphoreSlim> _heldLocks = new();
+    private bool _disposed;
 
     internal InMemoryUnitOfWork(InMemoryDatabase database)
     {
@@ -27,6 +31,13 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork
 
     public ITransactionRepository Transactions { get; }
 
+    // The fake has no database transaction to open: the publish step in CommitAsync is already all-or-nothing.
+    public Task BeginTransactionAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
+
     public Task CommitAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -36,7 +47,15 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork
             .Select(account => (account, _readVersions[account.Id]))
             .ToList();
 
-        _database.Commit(changedAccounts, _newAccounts, _newTransactions);
+        try
+        {
+            _database.Commit(changedAccounts, _newAccounts, _newTransactions);
+        }
+        finally
+        {
+            // The transaction is over, successful or not, so its row locks are released.
+            ReleaseLocks();
+        }
 
         // Success: the committed versions become the baseline for the next commit of this unit of work.
         foreach (var account in _accounts.Values)
@@ -47,6 +66,59 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork
         _newAccounts.Clear();
         _newTransactions.Clear();
         return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        ReleaseLocks();
+    }
+
+    private void ReleaseLocks()
+    {
+        foreach (var gate in _heldLocks)
+        {
+            gate.Release();
+        }
+
+        _heldLocks.Clear();
+    }
+
+    // Ascending id order is the lock order for every operation. Two transfers A→B and B→A therefore take
+    // A before B and cannot wait on each other in a cycle.
+    internal async Task<IReadOnlyDictionary<Guid, Account>> LockAccountsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        var ordered = ids.Distinct().OrderBy(id => id).ToList();
+
+        foreach (var id in ordered)
+        {
+            var gate = _database.GetRowLock(id);
+            await gate.WaitAsync(cancellationToken);
+
+            // Disposed while this request was waiting: give the lock back instead of keeping it forever.
+            if (_disposed)
+            {
+                gate.Release();
+                ReleaseLocks();
+                throw new ObjectDisposedException(nameof(InMemoryUnitOfWork));
+            }
+
+            _heldLocks.Add(gate);
+        }
+
+        var locked = new Dictionary<Guid, Account>();
+        foreach (var id in ordered)
+        {
+            var account = await FindAccountAsync(id, cancellationToken)
+                ?? throw new AccountNotFoundException(id);
+            locked[id] = account;
+        }
+
+        return locked;
     }
 
     private Task<Account?> FindAccountAsync(Guid id, CancellationToken cancellationToken)
@@ -111,6 +183,11 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork
 
         public Task AddAsync(Account account, CancellationToken cancellationToken) =>
             unitOfWork.AddAccountAsync(account, cancellationToken);
+
+        public Task<IReadOnlyDictionary<Guid, Account>> GetByIdsForUpdateAsync(
+            IReadOnlyCollection<Guid> ids,
+            CancellationToken cancellationToken) =>
+            unitOfWork.LockAccountsAsync(ids, cancellationToken);
     }
 
     private sealed class TransactionRepository(InMemoryUnitOfWork unitOfWork) : ITransactionRepository

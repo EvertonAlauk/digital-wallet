@@ -8,5 +8,11 @@ namespace DigitalWallet.Application.Ports;
 /// </summary>
 public interface IUnitOfWork
 {
+    /// <summary>
+    /// Opens a single database transaction that spans the locking reads and <see cref="CommitAsync"/>.
+    /// Needed by operations that lock rows (transfers). Operations that only use the version check do not call it.
+    /// </summary>
+    Task BeginTransactionAsync(CancellationToken cancellationToken);
+
     Task CommitAsync(CancellationToken cancellationToken);
 }

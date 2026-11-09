@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using DigitalWallet.Application.Exceptions;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Domain.Entities;
@@ -14,12 +15,17 @@ namespace DigitalWallet.Testing.InMemory;
 public sealed class InMemoryDatabase
 {
     private readonly object _gate = new();
+    private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _rowLocks = new();
     private readonly Dictionary<Guid, Account> _accounts = new();
     private readonly Dictionary<Guid, Transaction> _transactions = new();
     private readonly List<LedgerRow> _ledger = new();
     private long _lastSequence;
 
     public InMemoryUnitOfWork CreateUnitOfWork() => new(this);
+
+    /// <summary>The lock that stands in for a row lock on one account. Held until the unit of work commits or is disposed.</summary>
+    internal SemaphoreSlim GetRowLock(Guid accountId) =>
+        _rowLocks.GetOrAdd(accountId, _ => new SemaphoreSlim(1, 1));
 
     /// <summary>Returns a copy of the committed account, or null when it does not exist.</summary>
     public Account? GetAccount(Guid id)

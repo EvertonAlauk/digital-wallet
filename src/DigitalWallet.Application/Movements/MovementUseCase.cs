@@ -48,7 +48,7 @@ internal sealed class MovementUseCase(
         return new MovementResult(transaction.Id, transaction.Type.ToString(), customer.Balance.Amount);
     }
 
-    private static Money ToMoney(decimal amount)
+    internal static Money ToMoney(decimal amount)
     {
         // BRL has two decimal places. Extra precision is a malformed request, not a business rule.
         if (decimal.Round(amount, 2) != amount)

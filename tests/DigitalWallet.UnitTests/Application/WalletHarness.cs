@@ -2,6 +2,7 @@ using DigitalWallet.Application.Accounts;
 using DigitalWallet.Application.Movements;
 using DigitalWallet.Application.Settlement;
 using DigitalWallet.Application.Statements;
+using DigitalWallet.Application.Transfers;
 using DigitalWallet.Testing.Fakes;
 using DigitalWallet.Testing.InMemory;
 
@@ -79,6 +80,17 @@ internal sealed class WalletHarness
         }
 
         return account.Id;
+    }
+
+    public async Task<TransferResult> TransferAsync(Guid sourceAccountId, Guid destinationAccountId, decimal amount)
+    {
+        // The unit of work must outlive the await: disposing it earlier would release its row locks too soon.
+        // Disposal also releases the locks when the transfer is rejected.
+        using var unitOfWork = Database.CreateUnitOfWork();
+        var useCase = new TransferUseCase(unitOfWork.Accounts, unitOfWork.Transactions, unitOfWork, Clock);
+        return await useCase.ExecuteAsync(
+            new TransferCommand(sourceAccountId, destinationAccountId, amount),
+            CancellationToken.None);
     }
 
     public async Task BlockAccountAsync(Guid accountId)

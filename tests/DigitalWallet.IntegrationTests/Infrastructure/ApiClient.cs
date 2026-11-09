@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using DigitalWallet.Api.Features.Accounts;
 using DigitalWallet.Api.Features.Movements;
 using DigitalWallet.Api.Features.Statements;
+using DigitalWallet.Api.Features.Transfers;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalWallet.IntegrationTests.Infrastructure;
@@ -48,6 +49,9 @@ public sealed class ApiClient
         var suffix = query.Count == 0 ? string.Empty : "?" + string.Join("&", query);
         return _http.GetAsync($"/accounts/{accountId}/statement{suffix}");
     }
+
+    public Task<HttpResponseMessage> PostTransferAsync(Guid sourceAccountId, Guid destinationAccountId, decimal amount) =>
+        _http.PostAsJsonAsync("/transfers", new TransferRequest(sourceAccountId, destinationAccountId, amount));
 
     public Task<HttpResponseMessage> PostRawJsonAsync(string path, string json) =>
         _http.PostAsync(path, new StringContent(json, System.Text.Encoding.UTF8, "application/json"));

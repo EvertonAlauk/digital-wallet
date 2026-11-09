@@ -2,6 +2,7 @@ using DigitalWallet.Api.Common;
 using DigitalWallet.Api.Features.Accounts;
 using DigitalWallet.Api.Features.Movements;
 using DigitalWallet.Api.Features.Statements;
+using DigitalWallet.Api.Features.Transfers;
 using DigitalWallet.Application.Settlement;
 using DigitalWallet.Infrastructure;
 using DigitalWallet.Infrastructure.Persistence;
@@ -54,6 +55,7 @@ app.MapHealthChecks("/health");
 app.MapAccountEndpoints();
 app.MapMovementEndpoints();
 app.MapStatementEndpoints();
+app.MapTransferEndpoints();
 
 app.Run();
 
