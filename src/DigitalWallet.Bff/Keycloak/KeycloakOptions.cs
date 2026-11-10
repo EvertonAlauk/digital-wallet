@@ -1,3 +1,5 @@
+using DigitalWallet.Bff.Common;
+
 namespace DigitalWallet.Bff.Keycloak;
 
 /// <summary>
@@ -19,14 +21,14 @@ public sealed class KeycloakOptions
     /// <summary>Throws when a setting is missing, so the BFF does not start half-configured.</summary>
     public void Validate()
     {
-        if (!Uri.TryCreate(TokenEndpoint, UriKind.Absolute, out _))
+        if (!HttpUrl.IsAbsoluteHttp(TokenEndpoint))
         {
-            throw new InvalidOperationException("Keycloak:TokenEndpoint must be an absolute URL.");
+            throw new InvalidOperationException("Keycloak:TokenEndpoint must be an absolute http or https URL.");
         }
 
-        if (!Uri.TryCreate(LogoutEndpoint, UriKind.Absolute, out _))
+        if (!HttpUrl.IsAbsoluteHttp(LogoutEndpoint))
         {
-            throw new InvalidOperationException("Keycloak:LogoutEndpoint must be an absolute URL.");
+            throw new InvalidOperationException("Keycloak:LogoutEndpoint must be an absolute http or https URL.");
         }
 
         if (string.IsNullOrWhiteSpace(ClientId))

@@ -15,8 +15,26 @@ Any code, comment, files names should to be in english, both backend and fronten
 - src/DigitalWallet.Domain: entities and business rules, NO external dependencies
 - src/DigitalWallet.Application: use cases and ports (repository, unit of work, idempotency store, outbox, clock interfaces)
 - src/DigitalWallet.Infrastructure: EF Core implementations of the ports, messaging
-- src/DigitalWallet.Api: endpoints, DI, middleware
+- src/DigitalWallet.Api: endpoints, DI, middleware. JWT resource server, all /api/* routes require a Bearer token
+- src/DigitalWallet.Bff: the BFF and the only entry point for the browser — login/logout/session, server-side session, token refresh, YARP proxy of /api/* to the API
+- ui/: Next.js (App Router, TypeScript) frontend
 - tests/: UnitTests, IntegrationTests
+
+## Authentication
+- Keycloak is the identity backend only; the login screen is our own (ui/).
+  The BFF uses Direct Access Grants (ROPC); Standard Flow is disabled.
+  ROPC is an accepted decision for this study project (see ADR 0009). Authorization Code + PKCE is
+  the planned path when MFA or social login is needed; it is not implemented yet.
+- The application never stores passwords and has no users table for credentials.
+  Account ownership uses the Keycloak "sub" claim.
+- Tokens live ONLY in the BFF (server-side session store). The browser only
+  holds an opaque HttpOnly session cookie. The ui never handles tokens.
+- BFF public routes: POST /bff/login, GET /bff/session, POST /bff/logout.
+  /api/* in the BFF requires a session and is proxied to the API with a Bearer token.
+- Token refresh happens in the BFF, single-flight per session.
+- All POSTs and /api/* calls require the header "X-CSRF: 1".
+- Tests never use Keycloak: use fakes of IIdentityService and locally generated
+  test tokens.
 
 ## Testing strategy
 - Tests NEVER use PostgreSQL, Docker, Testcontainers or a real database.
