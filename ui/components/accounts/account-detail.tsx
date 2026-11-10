@@ -8,9 +8,15 @@ import { waitForOperation } from "@/lib/api/operations";
 import { formatMoney } from "@/lib/accounts/money";
 import { MAX_ACCOUNT_NAME_LENGTH } from "@/lib/accounts/ids";
 import { accountStatusLabel, isInactive } from "@/lib/accounts/status";
+import {
+  NO_STATEMENT_FILTER,
+  hasStatementFilter,
+  type StatementFilter,
+} from "@/lib/accounts/statement-filter";
 import type { Account, OperationAccepted, Operation, StatementItem } from "@/lib/accounts/types";
 import { BackLink } from "./back-link";
 import { MovementForm } from "./movement-form";
+import { StatementFilters } from "./statement-filters";
 import { StatementTable } from "./statement-table";
 import { TransferForm } from "./transfer-form";
 import styles from "./accounts.module.css";
@@ -44,6 +50,8 @@ export function AccountDetail({ accountId }: AccountDetailProps) {
     nextCursor: null,
   });
   const [loadingMore, setLoadingMore] = useState(false);
+  // The filter the statement currently shows. Every page request carries it, including "load older entries".
+  const [appliedFilter, setAppliedFilter] = useState<StatementFilter>(NO_STATEMENT_FILTER);
   // Each box shows the outcome of its own operations: deposits and withdrawals, or transfers.
   const [notices, setNotices] = useState<Record<NoticeGroup, OperationNotice | null>>({ movement: null, transfer: null });
   const [busy, setBusy] = useState(false);
@@ -78,8 +86,18 @@ export function AccountDetail({ accountId }: AccountDetailProps) {
   }, [accountId]);
 
   async function refreshAccountAndStatement() {
-    const [account, page] = await Promise.all([getAccount(accountId), getStatement(accountId)]);
+    const [account, page] = await Promise.all([
+      getAccount(accountId),
+      getStatement(accountId, { filter: appliedFilter }),
+    ]);
     setLoadState({ status: "ready", account });
+    setStatement({ items: page.items, nextCursor: page.nextCursor });
+  }
+
+  /** Shows the first page of the statement for a new filter. The filter is kept for the older pages too. */
+  async function applyStatementFilter(filter: StatementFilter) {
+    const page = await getStatement(accountId, { filter });
+    setAppliedFilter(filter);
     setStatement({ items: page.items, nextCursor: page.nextCursor });
   }
 
@@ -108,7 +126,7 @@ export function AccountDetail({ accountId }: AccountDetailProps) {
 
     setLoadingMore(true);
     try {
-      const page = await getStatement(accountId, statement.nextCursor);
+      const page = await getStatement(accountId, { cursor: statement.nextCursor, filter: appliedFilter });
       setStatement((current) => ({
         items: [...current.items, ...page.items],
         nextCursor: page.nextCursor,
@@ -279,10 +297,12 @@ export function AccountDetail({ accountId }: AccountDetailProps) {
         <h2 id="statement-title" className={styles.sectionTitle}>
           Statement
         </h2>
+        <StatementFilters applied={appliedFilter} onApply={applyStatementFilter} />
         <StatementTable
           items={statement.items}
           nextCursor={statement.nextCursor}
           loadingMore={loadingMore}
+          filtered={hasStatementFilter(appliedFilter)}
           onLoadMore={loadOlderEntries}
         />
       </section>

@@ -172,13 +172,17 @@ public sealed class InMemoryDatabase
     }
 
     /// <summary>Committed ledger entries of one account, most recent first, mirroring the statement query.</summary>
-    public IReadOnlyList<LedgerRecord> ReadAccountEntries(Guid accountId, long? beforeSequence, int limit)
+    public IReadOnlyList<LedgerRecord> ReadAccountEntries(Guid accountId, long? beforeSequence, int limit, LedgerFilter? filter = null)
     {
+        var narrowing = filter ?? LedgerFilter.None;
         lock (_gate)
         {
             return _ledger
                 .Where(row => row.AccountId == accountId)
                 .Where(row => beforeSequence is null || row.Sequence < beforeSequence)
+                .Where(row => narrowing.Type is null || row.Type == narrowing.Type)
+                .Where(row => narrowing.From is null || row.CreatedAt >= narrowing.From)
+                .Where(row => narrowing.To is null || row.CreatedAt < narrowing.To)
                 .OrderByDescending(row => row.Sequence)
                 .Take(limit)
                 .Select(row => new LedgerRecord(row.Sequence, row.TransactionId, row.Type, row.Amount, row.CreatedAt))

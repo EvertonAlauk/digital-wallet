@@ -214,8 +214,8 @@ describe("account page", () => {
 
     const table = await screen.findByRole("table");
     expect(within(table).getByText("Transfer")).toBeInTheDocument();
-    expect(within(table).getByText("In", { selector: "td" })).toBeInTheDocument();
-    expect(within(table).getByText("Out", { selector: "td" })).toBeInTheDocument();
+    expect(within(table).getByText("In", { selector: "span" }).className).toMatch(/badge/);
+    expect(within(table).getByText("Out", { selector: "span" })).toBeInTheDocument();
   });
 
   it("loads older entries with the cursor from the previous page", async () => {
@@ -231,7 +231,7 @@ describe("account page", () => {
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Load older entries" }));
 
-    expect(await screen.findByText("Withdrawal")).toBeInTheDocument();
+    expect(await within(await screen.findByRole("table")).findByText("Withdrawal")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Load older entries" })).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith("?cursor=cursor-2"))).toBe(true);
   });

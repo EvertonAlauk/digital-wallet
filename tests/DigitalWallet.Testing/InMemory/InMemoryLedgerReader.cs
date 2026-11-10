@@ -9,9 +9,10 @@ public sealed class InMemoryLedgerReader(InMemoryDatabase database) : ILedgerRea
         Guid accountId,
         long? beforeSequence,
         int limit,
+        LedgerFilter filter,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(database.ReadAccountEntries(accountId, beforeSequence, limit));
+        return Task.FromResult(database.ReadAccountEntries(accountId, beforeSequence, limit, filter));
     }
 }

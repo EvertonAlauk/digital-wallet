@@ -66,3 +66,80 @@ public class StatementApiTests(WalletApiFactory factory) : IClassFixture<WalletA
         return (await response.Content.ReadFromJsonAsync<AccountResponse>())!;
     }
 }
+
+public class StatementFilterApiTests(WalletApiFactory factory) : IClassFixture<WalletApiFactory>
+{
+    [Fact]
+    public async Task FilterByType_ReturnsOnlyThatKindOverHttp()
+    {
+        var api = new ApiClient(factory);
+        var account = (await (await api.PostAccountAsync("filter-type")).Content.ReadFromJsonAsync<AccountResponse>())!;
+        await api.FundAsync(account.Id, 50m);
+        await api.PostWithdrawalAsync(account.Id, 5m);
+        await factory.DrainAsync();
+
+        var response = await api.GetStatementAsync(account.Id, type: "Withdrawal");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var page = await response.Content.ReadFromJsonAsync<StatementResponse>();
+        page!.Items.Should().NotBeEmpty().And.OnlyContain(item => item.Type == "Withdrawal");
+    }
+
+    [Fact]
+    public async Task TypeFilter_IsCaseInsensitive()
+    {
+        var api = new ApiClient(factory);
+        var account = (await (await api.PostAccountAsync("filter-case")).Content.ReadFromJsonAsync<AccountResponse>())!;
+        await api.FundAsync(account.Id, 10m);
+
+        var response = await api.GetStatementAsync(account.Id, type: "deposit");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task UnknownType_Returns400()
+    {
+        var api = new ApiClient(factory);
+        var account = (await (await api.PostAccountAsync("filter-bad-type")).Content.ReadFromJsonAsync<AccountResponse>())!;
+
+        var response = await api.GetStatementAsync(account.Id, type: "Bonus");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task StartDateAfterEndDate_Returns400()
+    {
+        var api = new ApiClient(factory);
+        var account = (await (await api.PostAccountAsync("filter-dates")).Content.ReadFromJsonAsync<AccountResponse>())!;
+
+        var response = await api.GetStatementAsync(account.Id, from: "2026-02-01", to: "2026-01-01");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task MalformedDate_Returns400()
+    {
+        var api = new ApiClient(factory);
+        var account = (await (await api.PostAccountAsync("filter-bad-date")).Content.ReadFromJsonAsync<AccountResponse>())!;
+
+        var response = await api.GetStatementAsync(account.Id, from: "01/01/2026");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task DateFilter_ExcludesEntriesOutsideTheRange()
+    {
+        var api = new ApiClient(factory);
+        var account = (await (await api.PostAccountAsync("filter-future")).Content.ReadFromJsonAsync<AccountResponse>())!;
+        await api.FundAsync(account.Id, 20m);
+
+        var response = await api.GetStatementAsync(account.Id, from: "2001-01-01", to: "2001-01-02");
+
+        var page = await response.Content.ReadFromJsonAsync<StatementResponse>();
+        page!.Items.Should().BeEmpty();
+    }
+}

@@ -133,12 +133,18 @@ internal sealed class WalletHarness
         return new GetOperationUseCase(unitOfWork.Operations).ExecuteAsync(operationId, CancellationToken.None);
     }
 
-    public Task<StatementPage> StatementAsync(Guid accountId, string? cursor = null, int? limit = null)
+    public Task<StatementPage> StatementAsync(
+        Guid accountId,
+        string? cursor = null,
+        int? limit = null,
+        TransactionType? type = null,
+        DateOnly? from = null,
+        DateOnly? to = null)
     {
         var reader = new InMemoryLedgerReader(Database);
         var unitOfWork = Database.CreateUnitOfWork();
         var useCase = new GetStatementUseCase(unitOfWork.Accounts, reader);
-        return useCase.ExecuteAsync(new GetStatementQuery(accountId, cursor, limit), CancellationToken.None);
+        return useCase.ExecuteAsync(new GetStatementQuery(accountId, cursor, limit, type, from, to), CancellationToken.None);
     }
 
     public async Task<Guid> CreateFundedAccountAsync(decimal amount, Guid? ownerId = null)

@@ -1,6 +1,7 @@
 import { apiFetch } from "@/lib/api/client";
 import { newIdempotencyKey } from "@/lib/api/idempotency";
 import type { Account, AccountList, Statement } from "@/lib/accounts/types";
+import { NO_STATEMENT_FILTER, statementQuery, type StatementFilter } from "@/lib/accounts/statement-filter";
 
 export type AccountFilter = "active" | "inactive";
 
@@ -64,8 +65,14 @@ export function activateAccount(id: string): Promise<Account> {
   return apiFetch<Account>(`/api/accounts/${encodeURIComponent(id)}/activate`, { method: "POST" });
 }
 
-/** One page of the statement, newest first. Pass nextCursor back to read the older entries. */
-export function getStatement(accountId: string, cursor?: string | null): Promise<Statement> {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+/**
+ * One page of the statement, newest first. Pass nextCursor back to read the older entries. The filters apply to every
+ * page, so the same filter must be sent with the cursor.
+ */
+export function getStatement(
+  accountId: string,
+  options: { cursor?: string | null; filter?: StatementFilter } = {},
+): Promise<Statement> {
+  const query = statementQuery(options.filter ?? NO_STATEMENT_FILTER, options.cursor);
   return apiFetch<Statement>(`/api/accounts/${encodeURIComponent(accountId)}/statement${query}`);
 }

@@ -117,7 +117,13 @@ public sealed class ApiClient
         await _factory.DrainAsync();
     }
 
-    public Task<HttpResponseMessage> GetStatementAsync(Guid accountId, string? cursor = null, int? limit = null)
+    public Task<HttpResponseMessage> GetStatementAsync(
+        Guid accountId,
+        string? cursor = null,
+        int? limit = null,
+        string? type = null,
+        string? from = null,
+        string? to = null)
     {
         var query = new List<string>();
         if (cursor is not null)
@@ -128,6 +134,21 @@ public sealed class ApiClient
         if (limit is not null)
         {
             query.Add($"limit={limit}");
+        }
+
+        if (type is not null)
+        {
+            query.Add($"type={Uri.EscapeDataString(type)}");
+        }
+
+        if (from is not null)
+        {
+            query.Add($"from={from}");
+        }
+
+        if (to is not null)
+        {
+            query.Add($"to={to}");
         }
 
         var suffix = query.Count == 0 ? string.Empty : "?" + string.Join("&", query);

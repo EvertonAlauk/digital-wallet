@@ -10,6 +10,7 @@ internal sealed class LedgerReader(WalletDbContext dbContext) : ILedgerReader
         Guid accountId,
         long? beforeSequence,
         int limit,
+        LedgerFilter filter,
         CancellationToken cancellationToken)
     {
         var query = from entry in dbContext.LedgerEntries
@@ -28,6 +29,21 @@ internal sealed class LedgerReader(WalletDbContext dbContext) : ILedgerReader
         if (beforeSequence is { } before)
         {
             query = query.Where(row => row.Sequence < before);
+        }
+
+        if (filter.Type is { } type)
+        {
+            query = query.Where(row => row.Type == type);
+        }
+
+        if (filter.From is { } from)
+        {
+            query = query.Where(row => row.CreatedAt >= from);
+        }
+
+        if (filter.To is { } to)
+        {
+            query = query.Where(row => row.CreatedAt < to);
         }
 
         var rows = await query

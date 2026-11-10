@@ -6,6 +6,8 @@ interface StatementTableProps {
   items: StatementItem[];
   nextCursor: string | null;
   loadingMore: boolean;
+  /** True when a filter is applied, so an empty result says so. */
+  filtered: boolean;
   onLoadMore: () => void;
 }
 
@@ -13,9 +15,9 @@ interface StatementTableProps {
  * Ledger entries, newest first. A positive amount is money in (credit) and a negative amount is money out (debit),
  * so transfers show their direction.
  */
-export function StatementTable({ items, nextCursor, loadingMore, onLoadMore }: StatementTableProps) {
+export function StatementTable({ items, nextCursor, loadingMore, filtered, onLoadMore }: StatementTableProps) {
   if (items.length === 0) {
-    return <p className={styles.muted}>No activity yet.</p>;
+    return <p className={styles.muted}>{filtered ? "No entries match these filters." : "No activity yet."}</p>;
   }
 
   return (
@@ -39,7 +41,11 @@ export function StatementTable({ items, nextCursor, loadingMore, onLoadMore }: S
               <tr key={`${item.transactionId}-${item.createdAt}-${item.amount}`}>
                 <td>{new Date(item.createdAt).toLocaleString("en-US")}</td>
                 <td>{item.type}</td>
-                <td className={credit ? styles.credit : styles.debit}>{credit ? "In" : "Out"}</td>
+                <td>
+                  <span className={`${styles.badge} ${credit ? styles.badgeIn : styles.badgeOut}`}>
+                    {credit ? "In" : "Out"}
+                  </span>
+                </td>
                 <td className={`${styles.amount} ${credit ? styles.credit : styles.debit}`}>
                   {formatMoney(item.amount, item.currency)}
                 </td>

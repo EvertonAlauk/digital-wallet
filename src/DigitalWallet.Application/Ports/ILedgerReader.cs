@@ -7,14 +7,24 @@ namespace DigitalWallet.Application.Ports;
 public interface ILedgerReader
 {
     /// <summary>
-    /// Returns up to <paramref name="limit"/> entries of an account, most recent first.
+    /// Returns up to <paramref name="limit"/> entries of an account that match <paramref name="filter"/>, most recent first.
     /// When <paramref name="beforeSequence"/> is set, only entries with a smaller sequence are returned.
     /// </summary>
     Task<IReadOnlyList<LedgerRecord>> ReadAccountEntriesAsync(
         Guid accountId,
         long? beforeSequence,
         int limit,
+        LedgerFilter filter,
         CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Narrows a statement. <see cref="From"/> is inclusive and <see cref="To"/> is exclusive, both in UTC.
+/// Null fields do not filter.
+/// </summary>
+public sealed record LedgerFilter(TransactionType? Type = null, DateTimeOffset? From = null, DateTimeOffset? To = null)
+{
+    public static LedgerFilter None { get; } = new();
 }
 
 /// <summary>A ledger entry as shown in a statement. Sequence is the persistence order, used for cursors.</summary>

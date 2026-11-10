@@ -1,9 +1,20 @@
 using DigitalWallet.Application.Common;
 using DigitalWallet.Application.Ports;
+using DigitalWallet.Domain.Enums;
 
 namespace DigitalWallet.Application.Statements;
 
-public sealed record GetStatementQuery(Guid AccountId, string? Cursor, int? Limit);
+/// <summary>
+/// Statement request. <see cref="Type"/> narrows the entries to one kind. <see cref="FromDate"/> and <see cref="ToDate"/>
+/// are calendar days in UTC and both are inclusive. Null means no restriction.
+/// </summary>
+public sealed record GetStatementQuery(
+    Guid AccountId,
+    string? Cursor,
+    int? Limit,
+    TransactionType? Type = null,
+    DateOnly? FromDate = null,
+    DateOnly? ToDate = null);
 
 public sealed record StatementItem(
     Guid TransactionId,
@@ -28,13 +39,27 @@ public sealed class GetStatementUseCase(IAccountRepository accounts, ILedgerRead
             throw new RequestValidationException("limit", $"The limit must be between 1 and {MaxLimit}.");
         }
 
+        if (query.FromDate is { } from && query.ToDate is { } to && from > to)
+        {
+            throw new RequestValidationException("from", "The start date cannot be after the end date.");
+        }
+
+        var filter = new LedgerFilter(
+            query.Type,
+            query.FromDate?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) is { } start
+                ? new DateTimeOffset(start, TimeSpan.Zero)
+                : null,
+            query.ToDate?.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) is { } end
+                ? new DateTimeOffset(end, TimeSpan.Zero)
+                : null);
+
         var beforeSequence = query.Cursor is null ? (long?)null : StatementCursor.Decode(query.Cursor);
 
         var account = await accounts.GetByIdAsync(query.AccountId, cancellationToken)
             ?? throw new AccountNotFoundException(query.AccountId);
 
         // Read one extra entry to know whether another page exists without a second query.
-        var records = await ledger.ReadAccountEntriesAsync(account.Id, beforeSequence, limit + 1, cancellationToken);
+        var records = await ledger.ReadAccountEntriesAsync(account.Id, beforeSequence, limit + 1, filter, cancellationToken);
 
         var hasMore = records.Count > limit;
         var page = records.Take(limit).ToList();
