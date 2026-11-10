@@ -29,6 +29,8 @@ export interface ApiRequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   /** Sent as JSON. */
   body?: unknown;
+  /** Extra headers, such as Idempotency-Key. Authorization is never accepted here. */
+  headers?: Record<string, string>;
   /**
    * When true (the default), a 401 clears the local auth state and sends the browser to the login page.
    * Set it to false where 401 is an ordinary answer, such as a wrong password or a session check.
@@ -37,7 +39,7 @@ export interface ApiRequestOptions {
 }
 
 export async function apiFetch<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  const { method = "GET", body, handleUnauthorized = true } = options;
+  const { method = "GET", body, headers, handleUnauthorized = true } = options;
 
   const response = await fetch(path, {
     method,
@@ -45,6 +47,7 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
     headers: {
       ...CSRF_HEADERS,
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...headers,
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
@@ -85,8 +88,8 @@ function redirectToLogin(): void {
     return;
   }
 
-  const current = window.location.pathname;
-  if (current.startsWith("/login")) {
+  const current = `${window.location.pathname}${window.location.search}`;
+  if (window.location.pathname.startsWith("/login")) {
     return;
   }
 

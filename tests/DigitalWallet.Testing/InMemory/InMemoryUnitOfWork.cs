@@ -220,6 +220,12 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
         public Task AddAsync(Account account, CancellationToken cancellationToken) =>
             unitOfWork.AddAccountAsync(account, cancellationToken);
 
+        public Task<IReadOnlyList<Account>> ListByOwnerAsync(Guid ownerId, int limit, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(unitOfWork._database.ListAccountsByOwner(ownerId, limit));
+        }
+
         public Task<IReadOnlyDictionary<Guid, Account>> GetByIdsForUpdateAsync(
             IReadOnlyCollection<Guid> ids,
             CancellationToken cancellationToken) =>

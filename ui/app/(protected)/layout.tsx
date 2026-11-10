@@ -23,7 +23,9 @@ export default function ProtectedLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     // After the user signs out on purpose, the guard must not send them back with a returnUrl.
     if (status === "unauthenticated" && !signingOut) {
-      router.replace(`/login?returnUrl=${encodeURIComponent(pathname)}`);
+      // The query string is part of the page (for example /account?id=...), so it is kept in returnUrl.
+      const current = `${pathname}${window.location.search}`;
+      router.replace(`/login?returnUrl=${encodeURIComponent(current)}`);
     }
   }, [status, signingOut, pathname, router]);
 

@@ -11,12 +11,16 @@ namespace DigitalWallet.Domain.Entities;
 /// </summary>
 public sealed class Account
 {
-    private Account(Guid id, Guid ownerId, DateTimeOffset createdAt, AccountKind kind)
+    /// <summary>Longest name an account can have, in characters.</summary>
+    public const int MaxNameLength = 60;
+
+    private Account(Guid id, Guid ownerId, DateTimeOffset createdAt, AccountKind kind, string? name)
     {
         Id = id;
         OwnerId = ownerId;
         CreatedAt = createdAt;
         Kind = kind;
+        Name = name;
         Balance = Money.Zero();
         Status = AccountStatus.Active;
         Version = 0;
@@ -32,6 +36,9 @@ public sealed class Account
 
     public Guid OwnerId { get; }
 
+    /// <summary>Name chosen by the owner, or null when none was given.</summary>
+    public string? Name { get; }
+
     public AccountKind Kind { get; }
 
     public Money Balance { get; private set; }
@@ -43,12 +50,43 @@ public sealed class Account
 
     public DateTimeOffset CreatedAt { get; }
 
-    public static Account Open(Guid id, Guid ownerId, DateTimeOffset createdAt) =>
-        new(id, ownerId, createdAt, AccountKind.Customer);
+    /// <summary>
+    /// Opens a customer account. The name is optional: blank names are stored as no name. Throws
+    /// <see cref="InvalidAccountNameException"/> when the name is longer than <see cref="MaxNameLength"/> or has control characters.
+    /// </summary>
+    public static Account Open(Guid id, Guid ownerId, DateTimeOffset createdAt, string? name = null) =>
+        new(id, ownerId, createdAt, AccountKind.Customer, NormalizeName(name));
+
+    /// <summary>Trims the name. Returns null for blank input, and throws when the name breaks the naming rules.</summary>
+    public static string? NormalizeName(string? name)
+    {
+        if (name is null)
+        {
+            return null;
+        }
+
+        var trimmed = name.Trim();
+        if (trimmed.Length == 0)
+        {
+            return null;
+        }
+
+        if (trimmed.Length > MaxNameLength)
+        {
+            throw new InvalidAccountNameException($"The account name can have at most {MaxNameLength} characters.");
+        }
+
+        if (trimmed.Any(char.IsControl))
+        {
+            throw new InvalidAccountNameException("The account name cannot contain control characters.");
+        }
+
+        return trimmed;
+    }
 
     /// <summary>Opens the settlement account that is the counterpart of deposits and withdrawals.</summary>
     public static Account OpenSettlement(Guid id, DateTimeOffset createdAt) =>
-        new(id, Guid.Empty, createdAt, AccountKind.Settlement);
+        new(id, Guid.Empty, createdAt, AccountKind.Settlement, name: null);
 
     /// <summary>
     /// Restores an account from persisted state. Does not validate business rules, because the
@@ -61,9 +99,10 @@ public sealed class Account
         AccountStatus status,
         int version,
         DateTimeOffset createdAt,
-        AccountKind kind = AccountKind.Customer)
+        AccountKind kind = AccountKind.Customer,
+        string? name = null)
     {
-        var account = new Account(id, ownerId, createdAt, kind)
+        var account = new Account(id, ownerId, createdAt, kind, name)
         {
             Balance = balance,
             Status = status,

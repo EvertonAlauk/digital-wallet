@@ -10,6 +10,8 @@ public static class FrontendFolder
 {
     public const string Marker = "frontend-build-marker";
 
+    public const string LoginMarker = "login-page-marker";
+
     public static readonly string Path = Create();
 
     private static string Create()
@@ -17,6 +19,8 @@ public static class FrontendFolder
         var folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "bff-ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(folder);
         File.WriteAllText(System.IO.Path.Combine(folder, "index.html"), $"<!doctype html><title>Wallet</title><p>{Marker}</p>");
+        // A static export writes one HTML file per page, next to the index.
+        File.WriteAllText(System.IO.Path.Combine(folder, "login.html"), $"<!doctype html><title>Login</title><p>{LoginMarker}</p>");
         return folder;
     }
 }
@@ -49,6 +53,17 @@ public class StaticUiTests(FrontendBffFactory factory) : IClassFixture<FrontendB
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await response.Content.ReadAsStringAsync()).Should().Contain(FrontendFolder.Marker);
+    }
+
+    [Fact]
+    public async Task PageWithItsOwnHtmlFile_ServesThatPage_NotTheIndex()
+    {
+        var response = await _http.GetAsync("/login?returnUrl=%2Faccounts");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain(FrontendFolder.LoginMarker);
+        body.Should().NotContain(FrontendFolder.Marker);
     }
 
     [Fact]

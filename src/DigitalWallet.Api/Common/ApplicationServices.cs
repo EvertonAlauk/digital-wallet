@@ -15,6 +15,7 @@ internal static class ApplicationServices
     {
         services.AddScoped<CreateAccountUseCase>();
         services.AddScoped<GetAccountUseCase>();
+        services.AddScoped<ListAccountsUseCase>();
         services.AddScoped<GetStatementUseCase>();
         services.AddScoped<EnsureSettlementAccountUseCase>();
         services.AddScoped<IdempotencyService>();

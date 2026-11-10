@@ -15,6 +15,8 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
 
         builder.Property(account => account.OwnerId).IsRequired();
 
+        builder.Property(account => account.Name).HasMaxLength(Account.MaxNameLength);
+
         builder.Property(account => account.Kind)
             .HasConversion<string>()
             .HasMaxLength(20)

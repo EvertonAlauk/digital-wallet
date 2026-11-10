@@ -1,0 +1,159 @@
+.section {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.stack {
+  display: grid;
+  gap: 20px;
+}
+
+.movementRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.form {
+  display: grid;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 180px;
+}
+
+.field label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.field input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 600;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.secondaryButton {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listItem a {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--background);
+}
+
+.listItem a:hover {
+  border-color: var(--accent);
+}
+
+.balance {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.credit {
+  color: var(--success);
+}
+
+.debit {
+  color: var(--danger);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.table th,
+.table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.table td.amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

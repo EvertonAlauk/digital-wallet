@@ -39,6 +39,10 @@ namespace DigitalWallet.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Customer");
 
+                    b.Property<string>("Name")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 

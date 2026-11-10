@@ -38,11 +38,18 @@ internal sealed class WalletHarness
         return harness;
     }
 
-    public Task<AccountView> CreateAccountAsync(Guid ownerId)
+    public Task<AccountView> CreateAccountAsync(Guid ownerId, string? name = null)
     {
         var unitOfWork = Database.CreateUnitOfWork();
         var useCase = new CreateAccountUseCase(unitOfWork.Accounts, unitOfWork, Clock);
-        return useCase.ExecuteAsync(new CreateAccountCommand(ownerId), CancellationToken.None);
+        return useCase.ExecuteAsync(new CreateAccountCommand(ownerId, name), CancellationToken.None);
+    }
+
+    public Task<IReadOnlyList<AccountView>> ListAccountsAsync(Guid ownerId, int? limit = null)
+    {
+        var unitOfWork = Database.CreateUnitOfWork();
+        var useCase = new ListAccountsUseCase(unitOfWork.Accounts);
+        return useCase.ExecuteAsync(new ListAccountsQuery(ownerId, limit), CancellationToken.None);
     }
 
     public Task<AccountView> GetAccountAsync(Guid accountId)

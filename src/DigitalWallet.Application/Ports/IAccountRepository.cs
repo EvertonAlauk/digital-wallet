@@ -11,6 +11,9 @@ public interface IAccountRepository
 
     Task AddAsync(Account account, CancellationToken cancellationToken);
 
+    /// <summary>Customer accounts of one owner, newest first. Returns at most <paramref name="limit"/> accounts.</summary>
+    Task<IReadOnlyList<Account>> ListByOwnerAsync(Guid ownerId, int limit, CancellationToken cancellationToken);
+
     /// <summary>
     /// Locks the given accounts (SELECT ... FOR UPDATE) and returns them with their latest committed state.
     /// Locks are acquired in ascending id order, so two operations locking the same accounts cannot deadlock.

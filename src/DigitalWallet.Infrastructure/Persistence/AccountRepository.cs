@@ -1,6 +1,7 @@
 using DigitalWallet.Application.Common;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Domain.Entities;
+using DigitalWallet.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -16,6 +17,15 @@ internal sealed class AccountRepository(WalletDbContext dbContext) : IAccountRep
         dbContext.Accounts.Add(account);
         return Task.CompletedTask;
     }
+
+    public async Task<IReadOnlyList<Account>> ListByOwnerAsync(Guid ownerId, int limit, CancellationToken cancellationToken) =>
+        await dbContext.Accounts
+            .AsNoTracking()
+            .Where(account => account.OwnerId == ownerId && account.Kind == AccountKind.Customer)
+            .OrderByDescending(account => account.CreatedAt)
+            .ThenBy(account => account.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyDictionary<Guid, Account>> GetByIdsForUpdateAsync(
         IReadOnlyCollection<Guid> ids,

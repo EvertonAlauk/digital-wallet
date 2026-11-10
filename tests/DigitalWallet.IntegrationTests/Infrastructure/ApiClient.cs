@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using DigitalWallet.Api.Features.Accounts;
 using DigitalWallet.Api.Features.Movements;
 using DigitalWallet.Api.Features.Transfers;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -55,6 +56,13 @@ public sealed class ApiClient
     /// <summary>Creates an account owned by this client's user. The owner comes from the token, not from the request.</summary>
     public Task<HttpResponseMessage> PostAccountAsync() =>
         _http.PostAsync("/accounts", content: null);
+
+    /// <summary>Creates an account with an optional name, sent as the request body.</summary>
+    public Task<HttpResponseMessage> PostAccountAsync(string? name) =>
+        _http.PostAsJsonAsync("/accounts", new CreateAccountRequest(name));
+
+    public Task<HttpResponseMessage> ListAccountsAsync(int? limit = null) =>
+        _http.GetAsync(limit is null ? "/accounts" : $"/accounts?limit={limit}");
 
     public Task<HttpResponseMessage> GetAccountAsync(Guid accountId) =>
         _http.GetAsync($"/accounts/{accountId}");

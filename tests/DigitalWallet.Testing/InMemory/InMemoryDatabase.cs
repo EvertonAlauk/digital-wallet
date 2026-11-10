@@ -121,6 +121,21 @@ public sealed class InMemoryDatabase
         }
     }
 
+    /// <summary>Returns copies of the committed customer accounts of one owner, newest first.</summary>
+    public IReadOnlyList<Account> ListAccountsByOwner(Guid ownerId, int limit)
+    {
+        lock (_gate)
+        {
+            return _accounts.Values
+                .Where(account => account.OwnerId == ownerId && account.Kind == AccountKind.Customer)
+                .OrderByDescending(account => account.CreatedAt)
+                .ThenBy(account => account.Id)
+                .Take(limit)
+                .Select(Copy)
+                .ToList();
+        }
+    }
+
     /// <summary>Returns a copy of the committed transaction, or null when it does not exist.</summary>
     public Transaction? GetTransaction(Guid id)
     {
@@ -273,7 +288,8 @@ public sealed class InMemoryDatabase
             account.Status,
             account.Version,
             account.CreatedAt,
-            account.Kind);
+            account.Kind,
+            account.Name);
 
     private static Transaction Copy(Transaction transaction) =>
         Transaction.Rehydrate(
