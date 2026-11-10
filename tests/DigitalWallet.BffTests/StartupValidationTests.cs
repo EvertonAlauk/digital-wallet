@@ -78,3 +78,22 @@ public class StartupValidationTests
         act.Should().Throw<InvalidOperationException>().WithMessage("*TokenEndpoint*");
     }
 }
+
+public class HttpUrlTests
+{
+    [Theory]
+    [InlineData("https://idp.example/token")]
+    [InlineData("http://localhost:8081/realms/x")]
+    public void AbsoluteHttpUrls_AreAccepted(string value) =>
+        DigitalWallet.Bff.Common.HttpUrl.IsAbsoluteHttp(value).Should().BeTrue();
+
+    [Theory]
+    [InlineData("/token")]
+    [InlineData("token")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("ftp://idp.example/token")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void AnythingElse_IsRejected(string? value) =>
+        DigitalWallet.Bff.Common.HttpUrl.IsAbsoluteHttp(value).Should().BeFalse();
+}

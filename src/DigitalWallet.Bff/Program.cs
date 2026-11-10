@@ -24,9 +24,9 @@ builder.Services.AddBffSessions();
 
 // The API that /api/* is forwarded to. Required: a BFF without its API address would fail every proxied request.
 var apiBaseUrl = builder.Configuration["Api:BaseUrl"];
-if (string.IsNullOrWhiteSpace(apiBaseUrl) || !Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out _))
+if (!DigitalWallet.Bff.Common.HttpUrl.IsAbsoluteHttp(apiBaseUrl))
 {
-    throw new InvalidOperationException("Api:BaseUrl must be an absolute URL, for example http://localhost:8080.");
+    throw new InvalidOperationException("Api:BaseUrl must be an absolute http or https URL, for example http://localhost:8080.");
 }
 
 builder.Services.AddReverseProxy().LoadFromMemory(ApiProxy.Routes(), ApiProxy.Clusters(apiBaseUrl));
