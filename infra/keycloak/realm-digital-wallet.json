@@ -64,6 +64,14 @@
       "credentials": [
         { "type": "password", "value": "admin-dev-password", "temporary": false }
       ]
+    },
+    {
+      "username": "service-account-digital-wallet-registrar",
+      "serviceAccountClientId": "digital-wallet-registrar",
+      "enabled": true,
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-users", "view-realm"]
+      }
     }
   ],
   "clients": [
@@ -94,6 +102,22 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "digital-wallet-registrar",
+      "name": "Digital Wallet registrar",
+      "description": "Used only by the BFF to create user accounts through the Keycloak Admin API. Not a login client.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${REGISTRAR_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": true,
+      "redirectUris": [],
+      "webOrigins": []
     }
   ]
 }

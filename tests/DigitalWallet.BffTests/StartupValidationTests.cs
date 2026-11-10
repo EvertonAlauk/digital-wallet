@@ -35,6 +35,9 @@ public class StartupValidationTests
         LogoutEndpoint = "https://idp.example/logout",
         ClientId = "digital-wallet-bff",
         ClientSecret = "from-the-environment",
+        RegistrarClientId = "digital-wallet-registrar",
+        RegistrarClientSecret = "registrar-from-the-environment",
+        AdminBaseUrl = "https://idp.example/admin/realms/digital-wallet",
     };
 
     [Fact]
@@ -76,6 +79,59 @@ public class StartupValidationTests
         var act = () => options.Validate();
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*TokenEndpoint*");
+    }
+}
+
+public class RegistrarOptionsTests
+{
+    private static KeycloakOptions Valid() => new()
+    {
+        TokenEndpoint = "https://idp.example/token",
+        LogoutEndpoint = "https://idp.example/logout",
+        ClientId = "digital-wallet-bff",
+        ClientSecret = "from-the-environment",
+        RegistrarClientId = "digital-wallet-registrar",
+        RegistrarClientSecret = "registrar-from-the-environment",
+        AdminBaseUrl = "https://idp.example/admin/realms/digital-wallet",
+    };
+
+    [Fact]
+    public void MissingRegistrarSecret_FailsAtStartup()
+    {
+        var options = Valid();
+        options = new KeycloakOptions
+        {
+            TokenEndpoint = options.TokenEndpoint,
+            LogoutEndpoint = options.LogoutEndpoint,
+            ClientId = options.ClientId,
+            ClientSecret = options.ClientSecret,
+            RegistrarClientId = options.RegistrarClientId,
+            RegistrarClientSecret = string.Empty,
+            AdminBaseUrl = options.AdminBaseUrl,
+        };
+
+        var act = () => options.Validate();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*RegistrarClientSecret*");
+    }
+
+    [Fact]
+    public void RelativeAdminBaseUrl_FailsAtStartup()
+    {
+        var options = new KeycloakOptions
+        {
+            TokenEndpoint = "https://idp.example/token",
+            LogoutEndpoint = "https://idp.example/logout",
+            ClientId = "digital-wallet-bff",
+            ClientSecret = "x",
+            RegistrarClientId = "digital-wallet-registrar",
+            RegistrarClientSecret = "y",
+            AdminBaseUrl = "/admin",
+        };
+
+        var act = () => options.Validate();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*AdminBaseUrl*");
     }
 }
 
