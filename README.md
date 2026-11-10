@@ -43,7 +43,13 @@ docker compose up -d
 
 This starts PostgreSQL, RabbitMQ, Keycloak, the API, the BFF and the frontend (`ui`). Wait until `docker compose ps` shows them as running, then open **http://localhost:3000**.
 
-The frontend runs the Next.js development server in its container, with the source folder mounted, so edits in `ui/` reload in the browser.
+The frontend runs in its own container, `digital-wallet-ui`, as the Next.js development server. It listens on port
+**3000** inside the container, and the same port is published on the host. The `ui/` folder is mounted into the container,
+so edits reload in the browser without a rebuild. The container sends `/bff/*` and `/api/*` to the BFF over the Compose
+network (`BFF_URL=http://bff:8080`), so the browser only talks to `localhost:3000`.
+
+The number of accounts per page is set with `NEXT_PUBLIC_ACCOUNTS_PAGE_SIZE` in the host `.env` (default `5`). Restart
+the `ui` container after changing it.
 
 Keycloak imports the realm from `infra/keycloak/realm-digital-wallet.json` on its first start. The development users are:
 
@@ -57,7 +63,7 @@ These passwords are for local development only.
 
 ### 3. Run the frontend outside Docker (optional)
 
-The frontend already runs in Compose. To run it on the host instead, stop its container first (`docker compose stop ui`):
+The frontend already runs in Compose on port 3000. To run it on the host instead, stop its container first (`docker compose stop ui`), so the port is free:
 
 ```bash
 cd ui
@@ -73,9 +79,9 @@ In development, the Next.js server forwards `/bff/*` and `/api/*` to `BFF_URL` (
 
 | Service | URL |
 |---|---|
-| Frontend (development) | http://localhost:3000 |
-| BFF | http://localhost:8082 (Swagger in Development: `/swagger`) |
-| API | http://localhost:8080 (Swagger in Development: `/swagger`) |
+| Frontend | http://localhost:3000 |
+| BFF | http://localhost:8082 (Swagger in Development: `/swagger/index.html`) |
+| API | http://localhost:8080 (Swagger in Development: `/swagger/index.html`) |
 | Keycloak admin console | http://localhost:8081 (user `wallet-admin`) |
 | RabbitMQ management | http://localhost:15672 (user `wallet`, password `wallet`) |
 
