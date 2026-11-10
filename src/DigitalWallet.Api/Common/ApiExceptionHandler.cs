@@ -26,6 +26,10 @@ internal sealed class ApiExceptionHandler : IExceptionHandler
                 details = Problem(StatusCodes.Status404NotFound, "Account not found", exception.Message);
                 break;
 
+            case OperationNotFoundException:
+                details = Problem(StatusCodes.Status404NotFound, "Operation not found", exception.Message);
+                break;
+
             case ConcurrencyConflictException:
                 details = Problem(
                     StatusCodes.Status409Conflict,

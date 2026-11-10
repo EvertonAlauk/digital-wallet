@@ -1,11 +1,14 @@
+using DigitalWallet.Api.Background;
 using DigitalWallet.Api.Common;
 using DigitalWallet.Api.Common.Idempotency;
 using DigitalWallet.Api.Features.Accounts;
 using DigitalWallet.Api.Features.Movements;
+using DigitalWallet.Api.Features.Operations;
 using DigitalWallet.Api.Features.Statements;
 using DigitalWallet.Api.Features.Transfers;
 using DigitalWallet.Application.Settlement;
 using DigitalWallet.Infrastructure;
+using DigitalWallet.Infrastructure.Messaging.RabbitMq;
 using DigitalWallet.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Swashbuckle.AspNetCore.SwaggerUI;
@@ -16,6 +19,19 @@ var connectionString = builder.Configuration.GetConnectionString("Postgres")
     ?? throw new InvalidOperationException("Connection string 'Postgres' is not configured.");
 
 builder.Services.AddInfrastructure(connectionString);
+builder.Services.AddRabbitMq(new RabbitMqOptions(
+    Host: builder.Configuration["RabbitMq:Host"] ?? "localhost",
+    Port: int.TryParse(builder.Configuration["RabbitMq:Port"], out var port) ? port : 5672,
+    UserName: builder.Configuration["RabbitMq:Username"] ?? "guest",
+    Password: builder.Configuration["RabbitMq:Password"] ?? "guest"));
+
+// Background processing (outbox relay and RabbitMQ consumers) is not started in tests, which drive it explicitly.
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddHostedService<OutboxRelayService>();
+    builder.Services.AddHostedService<RabbitMqConsumerService>();
+}
+
 builder.Services.AddApplicationUseCases();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
@@ -58,6 +74,7 @@ app.MapAccountEndpoints();
 app.MapMovementEndpoints();
 app.MapStatementEndpoints();
 app.MapTransferEndpoints();
+app.MapOperationEndpoints();
 
 app.Run();
 

@@ -90,10 +90,10 @@ public sealed class Account
     }
 
     /// <summary>
-    /// Applies a ledger entry to the balance. A blocked account cannot move funds. A customer account
-    /// cannot go negative; a settlement account can.
+    /// Checks whether a ledger entry can be applied, without changing anything. Throws the business rule violation
+    /// that applying it would cause. Use it to validate a whole transaction before any balance is touched.
     /// </summary>
-    public void ApplyEntry(LedgerEntry entry)
+    public void EnsureCanApply(LedgerEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
@@ -114,8 +114,14 @@ public sealed class Account
         {
             throw new InsufficientFundsException(Id, Balance.Amount, -entry.Amount.Amount);
         }
+    }
 
-        Balance = newBalance;
+    /// <summary>Applies a ledger entry to the balance, after checking it with <see cref="EnsureCanApply"/>.</summary>
+    public void ApplyEntry(LedgerEntry entry)
+    {
+        EnsureCanApply(entry);
+
+        Balance = Balance.Add(entry.Amount);
         Version++;
     }
 }

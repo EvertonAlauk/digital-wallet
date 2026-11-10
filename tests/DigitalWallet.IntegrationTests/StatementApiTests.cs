@@ -17,7 +17,7 @@ public class StatementApiTests(WalletApiFactory factory) : IClassFixture<WalletA
         var account = await CreateAccountAsync();
         foreach (var amount in new[] { 10m, 20m, 30m })
         {
-            await _api.PostDepositAsync(account.Id, amount);
+            await _api.FundAsync(account.Id, amount);
         }
 
         var first = await _api.GetStatementAsync(account.Id, limit: 2);

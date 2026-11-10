@@ -1,5 +1,6 @@
 using DigitalWallet.Api.Common.Idempotency;
-using DigitalWallet.Application.Transfers;
+using DigitalWallet.Api.Features.Operations;
+using DigitalWallet.Application.Operations;
 
 namespace DigitalWallet.Api.Features.Transfers;
 
@@ -12,10 +13,9 @@ public static class TransferEndpoints
         group.MapPost("/", TransferAsync)
             .WithName("Transfer")
             .WithIdempotency()
-            .Produces<TransferResponse>(StatusCodes.Status201Created)
+            .Produces<OperationAcceptedResponse>(StatusCodes.Status202Accepted)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         return app;
@@ -23,21 +23,15 @@ public static class TransferEndpoints
 
     private static async Task<IResult> TransferAsync(
         TransferRequest request,
-        TransferUseCase useCase,
+        AcceptTransferUseCase useCase,
         CancellationToken cancellationToken)
     {
-        var result = await useCase.ExecuteAsync(
-            new TransferCommand(request.SourceAccountId, request.DestinationAccountId, request.Amount),
+        var accepted = await useCase.ExecuteAsync(
+            new AcceptTransferCommand(request.SourceAccountId, request.DestinationAccountId, request.Amount),
             cancellationToken);
 
-        return Results.Created($"/accounts/{request.SourceAccountId}", TransferResponse.From(result));
+        return OperationAcceptedResponse.ToResult(accepted);
     }
 }
 
 public sealed record TransferRequest(Guid SourceAccountId, Guid DestinationAccountId, decimal Amount);
-
-public sealed record TransferResponse(Guid TransactionId, decimal SourceBalance, decimal DestinationBalance)
-{
-    public static TransferResponse From(TransferResult result) =>
-        new(result.TransactionId, result.SourceBalance, result.DestinationBalance);
-}

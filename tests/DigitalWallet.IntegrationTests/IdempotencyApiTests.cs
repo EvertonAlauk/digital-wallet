@@ -3,25 +3,20 @@ using System.Net.Http.Json;
 using DigitalWallet.Api.Common.Idempotency;
 using DigitalWallet.Api.Features.Accounts;
 using DigitalWallet.Api.Features.Movements;
+using DigitalWallet.Api.Features.Operations;
 using DigitalWallet.Api.Features.Transfers;
-using DigitalWallet.IntegrationTests.Infrastructure;
 using DigitalWallet.Application.Idempotency;
+using DigitalWallet.IntegrationTests.Infrastructure;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalWallet.IntegrationTests;
 
 public class IdempotencyApiTests(WalletApiFactory factory) : IClassFixture<WalletApiFactory>
 {
-    private readonly HttpClient _http = factory.CreateClient(new WebApplicationFactoryClientOptions
-    {
-        BaseAddress = new Uri("https://localhost"),
-    });
-
     private readonly ApiClient _api = new(factory);
 
     [Fact]
-    public async Task SameKeyAndPayload_ReturnsTheOriginalResponseWithoutProcessingAgain()
+    public async Task SameKeyAndPayload_ReturnsTheOriginalAcceptanceWithoutProcessingAgain()
     {
         var account = await CreateAccountAsync();
         var key = Guid.NewGuid().ToString();
@@ -30,16 +25,17 @@ public class IdempotencyApiTests(WalletApiFactory factory) : IClassFixture<Walle
         var first = await PostAsync($"/accounts/{account}/deposits", new MovementRequest(25m), key);
         var second = await PostAsync($"/accounts/{account}/deposits", new MovementRequest(25m), key);
 
-        first.StatusCode.Should().Be(HttpStatusCode.Created);
-        second.StatusCode.Should().Be(HttpStatusCode.Created);
+        first.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        second.StatusCode.Should().Be(HttpStatusCode.Accepted);
         second.Headers.Contains(IdempotencyMiddleware.ReplayedHeaderName).Should().BeTrue();
 
-        var firstBody = await first.Content.ReadFromJsonAsync<MovementResponse>();
-        var secondBody = await second.Content.ReadFromJsonAsync<MovementResponse>();
-        secondBody!.TransactionId.Should().Be(firstBody!.TransactionId);
-        second.Headers.Location.Should().Be(first.Headers.Location);
+        var firstBody = await first.Content.ReadFromJsonAsync<OperationAcceptedResponse>();
+        var secondBody = await second.Content.ReadFromJsonAsync<OperationAcceptedResponse>();
+        secondBody!.OperationId.Should().Be(firstBody!.OperationId);
 
-        factory.Database.TransactionCount.Should().Be(transactionsBefore + 1, "the second request must not create a movement");
+        await factory.DrainAsync();
+
+        factory.Database.TransactionCount.Should().Be(transactionsBefore + 1, "the second request must not create an operation");
         factory.Database.GetAccount(account)!.Balance.Amount.Should().Be(25m);
     }
 
@@ -53,6 +49,7 @@ public class IdempotencyApiTests(WalletApiFactory factory) : IClassFixture<Walle
         var conflicting = await PostAsync($"/accounts/{account}/deposits", new MovementRequest(11m), key);
 
         conflicting.StatusCode.Should().Be((HttpStatusCode)422);
+        await factory.DrainAsync();
         factory.Database.GetAccount(account)!.Balance.Amount.Should().Be(10m);
     }
 
@@ -69,20 +66,17 @@ public class IdempotencyApiTests(WalletApiFactory factory) : IClassFixture<Walle
 
         try
         {
-            // Each request either processed the deposit (201), replayed it (201), or was told it is still in progress (409).
+            // Each request either was accepted (202), replayed the acceptance (202), or was told it is still in progress (409).
             responses.Select(response => response.StatusCode)
-                .Should().OnlyContain(status => status == HttpStatusCode.Created || status == HttpStatusCode.Conflict);
+                .Should().OnlyContain(status => status == HttpStatusCode.Accepted || status == HttpStatusCode.Conflict);
 
-            var created = responses.Where(response => response.StatusCode == HttpStatusCode.Created).ToList();
-            created.Should().NotBeEmpty();
-
-            var transactionIds = new HashSet<Guid>();
-            foreach (var response in created)
+            var operationIds = new HashSet<Guid>();
+            foreach (var response in responses.Where(r => r.StatusCode == HttpStatusCode.Accepted))
             {
-                transactionIds.Add((await response.Content.ReadFromJsonAsync<MovementResponse>())!.TransactionId);
+                operationIds.Add((await response.Content.ReadFromJsonAsync<OperationAcceptedResponse>())!.OperationId);
             }
 
-            transactionIds.Should().HaveCount(1, "every successful response must refer to the same movement");
+            operationIds.Should().HaveCount(1, "every accepted response must refer to the same operation");
         }
         finally
         {
@@ -92,43 +86,48 @@ public class IdempotencyApiTests(WalletApiFactory factory) : IClassFixture<Walle
             }
         }
 
+        await factory.DrainAsync();
         factory.Database.TransactionCount.Should().Be(transactionsBefore + 1, "exactly one deposit must be processed");
         factory.Database.GetAccount(account)!.Balance.Amount.Should().Be(7m);
     }
 
     [Fact]
-    public async Task ExpiredKey_IsProcessedAgain()
+    public async Task ExpiredKey_IsAcceptedAgain()
     {
         var account = await CreateAccountAsync();
         var key = Guid.NewGuid().ToString();
 
-        var first = await PostAsync($"/accounts/{account}/deposits", new MovementRequest(5m), key);
+        var first = (await (await PostAsync($"/accounts/{account}/deposits", new MovementRequest(5m), key))
+            .Content.ReadFromJsonAsync<OperationAcceptedResponse>())!;
         factory.Clock.Advance(TimeSpan.FromHours(25));
+
         var second = await PostAsync($"/accounts/{account}/deposits", new MovementRequest(5m), key);
 
-        second.StatusCode.Should().Be(HttpStatusCode.Created);
+        second.StatusCode.Should().Be(HttpStatusCode.Accepted);
         second.Headers.Contains(IdempotencyMiddleware.ReplayedHeaderName).Should().BeFalse();
-        var firstBody = await first.Content.ReadFromJsonAsync<MovementResponse>();
-        var secondBody = await second.Content.ReadFromJsonAsync<MovementResponse>();
-        secondBody!.TransactionId.Should().NotBe(firstBody!.TransactionId);
+        (await second.Content.ReadFromJsonAsync<OperationAcceptedResponse>())!.OperationId.Should().NotBe(first.OperationId);
+
+        await factory.DrainAsync();
         factory.Database.GetAccount(account)!.Balance.Amount.Should().Be(10m);
     }
 
     [Fact]
-    public async Task TransferWithTheSameKey_IsNotMovedTwice()
+    public async Task TransferWithTheSameKey_IsNotAcceptedTwice()
     {
         var source = await CreateAccountAsync();
         var destination = await CreateAccountAsync();
-        await _api.PostDepositAsync(source, 100m);
+        await _api.FundAsync(source, 100m);
         var key = Guid.NewGuid().ToString();
         var request = new TransferRequest(source, destination, 30m);
 
         var first = await PostAsync("/transfers", request, key);
         var second = await PostAsync("/transfers", request, key);
 
-        first.StatusCode.Should().Be(HttpStatusCode.Created);
-        second.StatusCode.Should().Be(HttpStatusCode.Created);
+        first.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        second.StatusCode.Should().Be(HttpStatusCode.Accepted);
         second.Headers.Contains(IdempotencyMiddleware.ReplayedHeaderName).Should().BeTrue();
+
+        await factory.DrainAsync();
         factory.Database.GetAccount(source)!.Balance.Amount.Should().Be(70m);
         factory.Database.GetAccount(destination)!.Balance.Amount.Should().Be(30m);
     }
@@ -143,8 +142,10 @@ public class IdempotencyApiTests(WalletApiFactory factory) : IClassFixture<Walle
         var retry = await PostAsync($"/accounts/{account}/deposits", new MovementRequest(4m), key);
 
         rejected.StatusCode.Should().Be((HttpStatusCode)422);
-        retry.StatusCode.Should().Be(HttpStatusCode.Created);
+        retry.StatusCode.Should().Be(HttpStatusCode.Accepted);
         retry.Headers.Contains(IdempotencyMiddleware.ReplayedHeaderName).Should().BeFalse();
+
+        await factory.DrainAsync();
         factory.Database.GetAccount(account)!.Balance.Amount.Should().Be(4m);
     }
 
@@ -153,13 +154,14 @@ public class IdempotencyApiTests(WalletApiFactory factory) : IClassFixture<Walle
     {
         var account = await CreateAccountAsync();
 
-        var first = (await _api.PostDepositAsync(account, 3m)).Headers.Location;
+        await _api.PostDepositAsync(account, 3m);
         var second = await _api.PostDepositAsync(account, 3m);
 
-        second.StatusCode.Should().Be(HttpStatusCode.Created);
+        second.StatusCode.Should().Be(HttpStatusCode.Accepted);
         second.Headers.Contains(IdempotencyMiddleware.ReplayedHeaderName).Should().BeFalse();
+
+        await factory.DrainAsync();
         factory.Database.GetAccount(account)!.Balance.Amount.Should().Be(6m);
-        first.Should().NotBeNull();
     }
 
     [Fact]
@@ -184,6 +186,6 @@ public class IdempotencyApiTests(WalletApiFactory factory) : IClassFixture<Walle
     {
         var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body) };
         request.Headers.Add(IdempotencyMiddleware.HeaderName, key);
-        return _http.SendAsync(request);
+        return _api.Http.SendAsync(request);
     }
 }

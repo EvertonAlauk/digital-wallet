@@ -1,5 +1,6 @@
 using DigitalWallet.Api.Common.Idempotency;
-using DigitalWallet.Application.Movements;
+using DigitalWallet.Api.Features.Operations;
+using DigitalWallet.Application.Operations;
 
 namespace DigitalWallet.Api.Features.Movements;
 
@@ -12,51 +13,44 @@ public static class MovementEndpoints
         group.MapPost("/{id:guid}/deposits", DepositAsync)
             .WithName("Deposit")
             .WithIdempotency()
-            .Produces<MovementResponse>(StatusCodes.Status201Created)
+            .Produces<OperationAcceptedResponse>(StatusCodes.Status202Accepted)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         group.MapPost("/{id:guid}/withdrawals", WithdrawAsync)
             .WithName("Withdraw")
             .WithIdempotency()
-            .Produces<MovementResponse>(StatusCodes.Status201Created)
+            .Produces<OperationAcceptedResponse>(StatusCodes.Status202Accepted)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         return app;
     }
 
+    // The request is accepted (202). The balance changes later, in the background; GET /operations/{id} shows the outcome.
     private static async Task<IResult> DepositAsync(
         Guid id,
         MovementRequest request,
-        DepositUseCase useCase,
+        AcceptDepositUseCase useCase,
         CancellationToken cancellationToken)
     {
-        var result = await useCase.ExecuteAsync(new MovementCommand(id, request.Amount), cancellationToken);
+        var accepted = await useCase.ExecuteAsync(new AcceptDepositCommand(id, request.Amount), cancellationToken);
 
-        return Results.Created($"/accounts/{id}", MovementResponse.From(result));
+        return OperationAcceptedResponse.ToResult(accepted);
     }
 
     private static async Task<IResult> WithdrawAsync(
         Guid id,
         MovementRequest request,
-        WithdrawalUseCase useCase,
+        AcceptWithdrawalUseCase useCase,
         CancellationToken cancellationToken)
     {
-        var result = await useCase.ExecuteAsync(new MovementCommand(id, request.Amount), cancellationToken);
+        var accepted = await useCase.ExecuteAsync(new AcceptWithdrawalCommand(id, request.Amount), cancellationToken);
 
-        return Results.Created($"/accounts/{id}", MovementResponse.From(result));
+        return OperationAcceptedResponse.ToResult(accepted);
     }
 }
 
 public sealed record MovementRequest(decimal Amount);
-
-public sealed record MovementResponse(Guid TransactionId, string Type, decimal AccountBalance)
-{
-    public static MovementResponse From(MovementResult result) =>
-        new(result.TransactionId, result.Type, result.AccountBalance);
-}

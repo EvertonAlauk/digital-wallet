@@ -1,4 +1,6 @@
 using DigitalWallet.Application.Common;
+using DigitalWallet.Application.Operations;
+using DigitalWallet.Application.Outbox;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Domain.Entities;
 
@@ -6,9 +8,9 @@ namespace DigitalWallet.Testing.InMemory;
 
 /// <summary>
 /// Unit of work over <see cref="InMemoryDatabase"/>. Keeps one working copy per account (identity map),
-/// remembers the version each account had when it was first read, and publishes everything atomically on commit.
-/// Row locks taken by <see cref="IAccountRepository.GetByIdsForUpdateAsync"/> are held until commit or dispose.
-/// Not thread-safe by itself: each operation should use its own unit of work.
+/// remembers the version each account had when it was first read, and publishes everything atomically on commit,
+/// including outbox messages and operations. Row locks taken by <see cref="IAccountRepository.GetByIdsForUpdateAsync"/>
+/// are held until commit or dispose. Not thread-safe by itself: each operation should use its own unit of work.
 /// </summary>
 public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
 {
@@ -17,6 +19,8 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
     private readonly Dictionary<Guid, int> _readVersions = new();
     private readonly List<Account> _newAccounts = new();
     private readonly List<Transaction> _newTransactions = new();
+    private readonly List<OutboxMessage> _newOutbox = new();
+    private readonly List<Operation> _operationWrites = new();
     private readonly List<SemaphoreSlim> _heldLocks = new();
     private bool _disposed;
 
@@ -25,11 +29,18 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
         _database = database;
         Accounts = new AccountRepository(this);
         Transactions = new TransactionRepository(this);
+        Operations = new OperationRepository(this);
+        Outbox = new OutboxStaging(this);
     }
 
     public IAccountRepository Accounts { get; }
 
     public ITransactionRepository Transactions { get; }
+
+    public IOperationRepository Operations { get; }
+
+    /// <summary>Outbox of this unit of work. Messages are published to the committed store only on commit.</summary>
+    public IOutbox Outbox { get; }
 
     // The fake has no database transaction to open: the publish step in CommitAsync is already all-or-nothing.
     public Task BeginTransactionAsync(CancellationToken cancellationToken)
@@ -49,7 +60,7 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
 
         try
         {
-            _database.Commit(changedAccounts, _newAccounts, _newTransactions);
+            _database.Commit(changedAccounts, _newAccounts, _newTransactions, _newOutbox, _operationWrites);
         }
         finally
         {
@@ -65,6 +76,8 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
 
         _newAccounts.Clear();
         _newTransactions.Clear();
+        _newOutbox.Clear();
+        _operationWrites.Clear();
         return Task.CompletedTask;
     }
 
@@ -176,6 +189,29 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
         return Task.CompletedTask;
     }
 
+    private Task<Operation?> FindOperationAsync(Guid id, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // The latest staged write wins, so a unit of work sees its own changes.
+        var staged = _operationWrites.LastOrDefault(operation => operation.Id == id);
+        return Task.FromResult<Operation?>(staged ?? _database.GetOperation(id));
+    }
+
+    private Task AddOperationAsync(Operation operation, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _operationWrites.Add(operation);
+        return Task.CompletedTask;
+    }
+
+    private Task UpdateOperationAsync(Operation operation, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _operationWrites.Add(operation);
+        return Task.CompletedTask;
+    }
+
     private sealed class AccountRepository(InMemoryUnitOfWork unitOfWork) : IAccountRepository
     {
         public Task<Account?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
@@ -197,5 +233,22 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
 
         public Task AddAsync(Transaction transaction, CancellationToken cancellationToken) =>
             unitOfWork.AddTransactionAsync(transaction, cancellationToken);
+    }
+
+    private sealed class OperationRepository(InMemoryUnitOfWork unitOfWork) : IOperationRepository
+    {
+        public Task AddAsync(Operation operation, CancellationToken cancellationToken) =>
+            unitOfWork.AddOperationAsync(operation, cancellationToken);
+
+        public Task<Operation?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+            unitOfWork.FindOperationAsync(id, cancellationToken);
+
+        public Task UpdateAsync(Operation operation, CancellationToken cancellationToken) =>
+            unitOfWork.UpdateOperationAsync(operation, cancellationToken);
+    }
+
+    private sealed class OutboxStaging(InMemoryUnitOfWork unitOfWork) : IOutbox
+    {
+        public void Enqueue(OutboxMessage message) => unitOfWork._newOutbox.Add(message);
     }
 }

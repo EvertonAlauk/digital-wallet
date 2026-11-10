@@ -1,16 +1,17 @@
 using System.Net;
+using System.Net.Http.Json;
 using DigitalWallet.Api.Features.Accounts;
-using DigitalWallet.Api.Features.Movements;
+using DigitalWallet.Api.Features.Operations;
 using DigitalWallet.Application.Settlement;
+using DigitalWallet.Domain.Enums;
 using DigitalWallet.IntegrationTests.Infrastructure;
 using FluentAssertions;
-using System.Net.Http.Json;
 
 namespace DigitalWallet.IntegrationTests;
 
 /// <summary>
-/// 1,000 transfers fired at once among a small group of accounts, so most of them contend for the same rows.
-/// Checks the three invariants the wallet must keep under concurrency.
+/// 1,000 transfers accepted at once among a small group of accounts, so most of them contend for the same balances.
+/// The pipeline then processes them. Checks the invariants the wallet must keep under concurrency.
 /// </summary>
 public class ConcurrentTransfersTests(WalletApiFactory factory) : IClassFixture<WalletApiFactory>
 {
@@ -29,7 +30,7 @@ public class ConcurrentTransfersTests(WalletApiFactory factory) : IClassFixture<
         for (var index = 0; index < AccountCount; index++)
         {
             var created = (await (await api.PostAccountAsync(Guid.NewGuid())).Content.ReadFromJsonAsync<AccountResponse>())!;
-            await api.PostDepositAsync(created.Id, InitialBalance);
+            await api.FundAsync(created.Id, InitialBalance);
             accounts.Add(created.Id);
         }
 
@@ -49,15 +50,17 @@ public class ConcurrentTransfersTests(WalletApiFactory factory) : IClassFixture<
         var responses = await Task.WhenAll(plans.Select(plan =>
             api.PostTransferAsync(plan.From, plan.To, plan.Amount))).WaitAsync(Guard);
 
+        var operationIds = new List<Guid>();
         try
         {
-            // Every transfer either commits (201) or is rejected for insufficient funds (422). None may fail
-            // any other way: a 409 would mean a lock was bypassed, and a 500 would mean an unexpected fault.
-            responses.Select(response => response.StatusCode)
-                .Should().OnlyContain(status => status == HttpStatusCode.Created || status == (HttpStatusCode)422);
+            // Every transfer is accepted (202). Insufficient funds shows up later as a rejected operation, never as a
+            // server error or a conflict at acceptance.
+            responses.Select(response => response.StatusCode).Should().OnlyContain(status => status == HttpStatusCode.Accepted);
 
-            responses.Count(response => response.StatusCode == HttpStatusCode.Created)
-                .Should().BeGreaterThan(0, "some transfers must succeed for the test to mean anything");
+            foreach (var response in responses)
+            {
+                operationIds.Add((await response.Content.ReadFromJsonAsync<OperationAcceptedResponse>())!.OperationId);
+            }
         }
         finally
         {
@@ -67,7 +70,14 @@ public class ConcurrentTransfersTests(WalletApiFactory factory) : IClassFixture<
             }
         }
 
-        // (1) No balance is negative. Customer accounts cannot go below zero (the settlement account may).
+        await factory.DrainAsync();
+
+        var outcomes = operationIds.Select(id => factory.Database.GetOperation(id)!.Status).ToList();
+        outcomes.Should().OnlyContain(status => status == OperationStatus.Completed || status == OperationStatus.Rejected);
+        outcomes.Count(status => status == OperationStatus.Completed).Should().BeGreaterThan(0,
+            "some transfers must complete for the test to mean anything");
+
+        // (1) No customer balance is negative. Only the settlement account may be.
         foreach (var account in accounts)
         {
             factory.Database.GetAccount(account)!.Balance.Amount.Should().BeGreaterThanOrEqualTo(0m);
@@ -78,7 +88,7 @@ public class ConcurrentTransfersTests(WalletApiFactory factory) : IClassFixture<
         customerTotal.Should().Be(AccountCount * InitialBalance);
 
         // (3) Each cached balance equals the sum of that account's ledger entries.
-        var allAccounts = accounts.Append(SettlementAccount.Id);
+        var allAccounts = accounts.Append(SettlementAccount.Id).ToList();
         foreach (var account in allAccounts)
         {
             var cached = factory.Database.GetAccount(account)!.Balance.Amount;
@@ -87,7 +97,7 @@ public class ConcurrentTransfersTests(WalletApiFactory factory) : IClassFixture<
             cached.Should().Be(fromLedger, $"account {account} must match its ledger");
         }
 
-        // Double entry: across all accounts, including settlement, the ledger nets to zero.
+        // Double entry: across all accounts, including settlement, the balances net to zero.
         allAccounts.Sum(account => factory.Database.GetAccount(account)!.Balance.Amount).Should().Be(0m);
     }
 }

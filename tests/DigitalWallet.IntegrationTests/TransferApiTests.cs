@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using DigitalWallet.Api.Features.Accounts;
-using DigitalWallet.Api.Features.Movements;
-using DigitalWallet.Api.Features.Transfers;
+using DigitalWallet.Api.Features.Operations;
 using DigitalWallet.IntegrationTests.Infrastructure;
+using DigitalWallet.Domain.Enums;
 using FluentAssertions;
 
 namespace DigitalWallet.IntegrationTests;
@@ -13,62 +13,72 @@ public class TransferApiTests(WalletApiFactory factory) : IClassFixture<WalletAp
     private readonly ApiClient _api = new(factory);
 
     [Fact]
-    public async Task Transfer_Returns201WithBothBalances()
+    public async Task Transfer_Returns202AndCompletesInTheBackground()
     {
-        var source = await CreateFundedAccountAsync(200m);
-        var destination = await CreateFundedAccountAsync(0m);
+        var source = await CreateAccountAsync();
+        var destination = await CreateAccountAsync();
+        await _api.FundAsync(source, 200m);
 
         var response = await _api.PostTransferAsync(source, destination, 75m);
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var accepted = (await response.Content.ReadFromJsonAsync<OperationAcceptedResponse>())!;
 
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var transfer = (await response.Content.ReadFromJsonAsync<TransferResponse>())!;
-        transfer.SourceBalance.Should().Be(125m);
-        transfer.DestinationBalance.Should().Be(75m);
-        transfer.TransactionId.Should().NotBeEmpty();
+        await factory.DrainAsync();
+
+        (await OperationAsync(accepted.OperationId)).Status.Should().Be(OperationStatus.Completed.ToString());
+        factory.Database.GetAccount(source)!.Balance.Amount.Should().Be(125m);
+        factory.Database.GetAccount(destination)!.Balance.Amount.Should().Be(75m);
     }
 
     [Fact]
-    public async Task Transfer_ToSameAccount_Returns422()
+    public async Task Transfer_ToSameAccount_Returns422Immediately()
     {
-        var account = await CreateFundedAccountAsync(100m);
+        var account = await CreateAccountAsync();
 
         var response = await _api.PostTransferAsync(account, account, 10m);
 
         response.StatusCode.Should().Be((HttpStatusCode)422);
-        factory.Database.GetAccount(account)!.Balance.Amount.Should().Be(100m);
     }
 
     [Fact]
-    public async Task Transfer_InsufficientFunds_Returns422AndChangesNothing()
+    public async Task Transfer_InsufficientFunds_IsRejectedAndChangesNothing()
     {
-        var source = await CreateFundedAccountAsync(20m);
-        var destination = await CreateFundedAccountAsync(0m);
+        var source = await CreateAccountAsync();
+        var destination = await CreateAccountAsync();
+        await _api.FundAsync(source, 20m);
 
         var response = await _api.PostTransferAsync(source, destination, 21m);
+        response.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var accepted = (await response.Content.ReadFromJsonAsync<OperationAcceptedResponse>())!;
 
-        response.StatusCode.Should().Be((HttpStatusCode)422);
+        await factory.DrainAsync();
+
+        var operation = await OperationAsync(accepted.OperationId);
+        operation.Status.Should().Be(OperationStatus.Rejected.ToString());
         factory.Database.GetAccount(source)!.Balance.Amount.Should().Be(20m);
         factory.Database.GetAccount(destination)!.Balance.Amount.Should().Be(0m);
     }
 
     [Fact]
-    public async Task Transfer_UnknownAccount_Returns404()
+    public async Task Transfer_UnknownAccount_Returns404Immediately()
     {
-        var source = await CreateFundedAccountAsync(20m);
+        var source = await CreateAccountAsync();
 
         var response = await _api.PostTransferAsync(source, Guid.NewGuid(), 1m);
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    private async Task<Guid> CreateFundedAccountAsync(decimal balance)
+    private async Task<Guid> CreateAccountAsync()
     {
-        var created = (await (await _api.PostAccountAsync(Guid.NewGuid())).Content.ReadFromJsonAsync<AccountResponse>())!;
-        if (balance > 0m)
-        {
-            await _api.PostDepositAsync(created.Id, balance);
-        }
+        var response = await _api.PostAccountAsync(Guid.NewGuid());
+        return (await response.Content.ReadFromJsonAsync<AccountResponse>())!.Id;
+    }
 
-        return created.Id;
+    private async Task<OperationResponse> OperationAsync(Guid operationId)
+    {
+        var response = await _api.GetOperationAsync(operationId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        return (await response.Content.ReadFromJsonAsync<OperationResponse>())!;
     }
 }

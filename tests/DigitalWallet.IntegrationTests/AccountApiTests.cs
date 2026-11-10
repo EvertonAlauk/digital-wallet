@@ -50,7 +50,7 @@ public class AccountApiTests(WalletApiFactory factory) : IClassFixture<WalletApi
     public async Task GetAccount_Existing_Returns200WithBalance()
     {
         var created = await CreateAccountAsync();
-        await _api.PostDepositAsync(created.Id, 42m);
+        await _api.FundAsync(created.Id, 42m);
 
         var response = await _api.GetAccountAsync(created.Id);
 

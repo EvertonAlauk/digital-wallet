@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using DigitalWallet.Application.Exceptions;
 using DigitalWallet.Application.Idempotency;
+using DigitalWallet.Application.Outbox;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Domain.Entities;
 using DigitalWallet.Domain.Enums;
@@ -21,6 +22,32 @@ public sealed class InMemoryDatabase
     private readonly Dictionary<Guid, Transaction> _transactions = new();
     private readonly List<LedgerRow> _ledger = new();
     private long _lastSequence;
+    private readonly List<OutboxRow> _outbox = new();
+    private readonly Dictionary<Guid, Operation> _operations = new();
+
+    /// <summary>Returns a copy of the committed operation, or null when it does not exist.</summary>
+    public Operation? GetOperation(Guid id)
+    {
+        lock (_gate)
+        {
+            return _operations.TryGetValue(id, out var operation) ? CopyOperation(operation) : null;
+        }
+    }
+
+    private static Operation CopyOperation(Operation operation) =>
+        Operation.Rehydrate(
+            operation.Id,
+            operation.Kind,
+            operation.AccountId,
+            operation.DestinationAccountId,
+            operation.Amount,
+            operation.CreatedAt,
+            operation.Status,
+            operation.FailureReason,
+            operation.TransactionId,
+            operation.CompletedAt);
+
+    private sealed record OutboxRow(long Sequence, OutboxMessage Message, DateTimeOffset? PublishedAt);
 
     public InMemoryUnitOfWork CreateUnitOfWork() => new(this);
 
@@ -129,10 +156,48 @@ public sealed class InMemoryDatabase
         }
     }
 
+    /// <summary>Committed outbox messages, oldest first, with their publish time once published.</summary>
+    public IReadOnlyList<(OutboxMessage Message, DateTimeOffset? PublishedAt)> OutboxMessages
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _outbox.Select(row => (row.Message, row.PublishedAt)).ToList();
+            }
+        }
+    }
+
+    internal IReadOnlyList<OutboxMessage> GetPendingOutbox(int limit)
+    {
+        lock (_gate)
+        {
+            return _outbox
+                .Where(row => row.PublishedAt is null)
+                .Take(limit)
+                .Select(row => row.Message)
+                .ToList();
+        }
+    }
+
+    internal void MarkOutboxPublished(Guid messageId, DateTimeOffset publishedAt)
+    {
+        lock (_gate)
+        {
+            var index = _outbox.FindIndex(row => row.Message.Id == messageId);
+            if (index >= 0)
+            {
+                _outbox[index] = _outbox[index] with { PublishedAt = publishedAt };
+            }
+        }
+    }
+
     internal void Commit(
         IReadOnlyCollection<(Account Account, int ReadVersion)> changedAccounts,
         IReadOnlyCollection<Account> newAccounts,
-        IReadOnlyCollection<Transaction> newTransactions)
+        IReadOnlyCollection<Transaction> newTransactions,
+        IReadOnlyCollection<OutboxMessage> newOutbox,
+        IReadOnlyCollection<Operation> operationWrites)
     {
         lock (_gate)
         {
@@ -161,7 +226,17 @@ public sealed class InMemoryDatabase
                 }
             }
 
-            // Phase 2: publish. Nothing below can fail.
+            // Phase 2: publish. Nothing below can fail. Outbox messages commit together with the changes that produced them.
+            foreach (var message in newOutbox)
+            {
+                _outbox.Add(new OutboxRow(++_lastSequence, message, PublishedAt: null));
+            }
+
+            foreach (var operation in operationWrites)
+            {
+                _operations[operation.Id] = CopyOperation(operation);
+            }
+
             foreach (var (account, _) in changedAccounts)
             {
                 _accounts[account.Id] = Copy(account);

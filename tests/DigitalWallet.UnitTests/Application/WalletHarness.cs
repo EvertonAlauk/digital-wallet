@@ -1,16 +1,15 @@
 using DigitalWallet.Application.Accounts;
-using DigitalWallet.Application.Movements;
+using DigitalWallet.Application.Operations;
 using DigitalWallet.Application.Settlement;
 using DigitalWallet.Application.Statements;
-using DigitalWallet.Application.Transfers;
 using DigitalWallet.Testing.Fakes;
 using DigitalWallet.Testing.InMemory;
 
 namespace DigitalWallet.UnitTests.Application;
 
 /// <summary>
-/// Builds the use cases over the in-memory fakes. Each call creates its own unit of work, the same way
-/// a request does in the API.
+/// Builds the use cases over the in-memory fakes. Requests are accepted through the real use cases, and the
+/// pipeline runs the real handlers. Methods that return an operation drain the pipeline first.
 /// </summary>
 internal sealed class WalletHarness
 {
@@ -20,11 +19,20 @@ internal sealed class WalletHarness
     {
         Database = new InMemoryDatabase();
         Clock = new FakeClock(Now);
+        Notifications = new InMemoryNotificationSender();
+        ProcessedMessages = new InMemoryProcessedMessageStore();
+        Pipeline = new InMemoryPipeline(Database, Clock, Notifications, ProcessedMessages);
     }
 
     public InMemoryDatabase Database { get; }
 
     public FakeClock Clock { get; }
+
+    public InMemoryNotificationSender Notifications { get; }
+
+    public InMemoryProcessedMessageStore ProcessedMessages { get; }
+
+    public InMemoryPipeline Pipeline { get; }
 
     /// <summary>Creates a harness with the settlement account already initialized, as the API does at startup.</summary>
     public static async Task<WalletHarness> CreateAsync()
@@ -49,18 +57,55 @@ internal sealed class WalletHarness
         return new GetAccountUseCase(unitOfWork.Accounts).ExecuteAsync(accountId, CancellationToken.None);
     }
 
-    public Task<MovementResult> DepositAsync(Guid accountId, decimal amount)
+    /// <summary>Accepts a deposit without running the pipeline, so tests can inspect the accepted state.</summary>
+    public async Task<OperationAccepted> AcceptDepositOnlyAsync(Guid accountId, decimal amount)
     {
-        var unitOfWork = Database.CreateUnitOfWork();
-        var useCase = new DepositUseCase(unitOfWork.Accounts, unitOfWork.Transactions, unitOfWork, Clock);
-        return useCase.ExecuteAsync(new MovementCommand(accountId, amount), CancellationToken.None);
+        using var unitOfWork = Database.CreateUnitOfWork();
+        var useCase = new AcceptDepositUseCase(unitOfWork.Accounts, unitOfWork.Operations, unitOfWork.Outbox, unitOfWork, Clock);
+        return await useCase.ExecuteAsync(new AcceptDepositCommand(accountId, amount), CancellationToken.None);
     }
 
-    public Task<MovementResult> WithdrawAsync(Guid accountId, decimal amount)
+    public async Task<OperationAccepted> AcceptWithdrawalOnlyAsync(Guid accountId, decimal amount)
     {
-        var unitOfWork = Database.CreateUnitOfWork();
-        var useCase = new WithdrawalUseCase(unitOfWork.Accounts, unitOfWork.Transactions, unitOfWork, Clock);
-        return useCase.ExecuteAsync(new MovementCommand(accountId, amount), CancellationToken.None);
+        using var unitOfWork = Database.CreateUnitOfWork();
+        var useCase = new AcceptWithdrawalUseCase(unitOfWork.Accounts, unitOfWork.Operations, unitOfWork.Outbox, unitOfWork, Clock);
+        return await useCase.ExecuteAsync(new AcceptWithdrawalCommand(accountId, amount), CancellationToken.None);
+    }
+
+    public async Task<OperationAccepted> AcceptTransferOnlyAsync(Guid sourceAccountId, Guid destinationAccountId, decimal amount)
+    {
+        using var unitOfWork = Database.CreateUnitOfWork();
+        var useCase = new AcceptTransferUseCase(unitOfWork.Accounts, unitOfWork.Operations, unitOfWork.Outbox, unitOfWork, Clock);
+        return await useCase.ExecuteAsync(
+            new AcceptTransferCommand(sourceAccountId, destinationAccountId, amount),
+            CancellationToken.None);
+    }
+
+    public async Task<OperationView> DepositAsync(Guid accountId, decimal amount)
+    {
+        var accepted = await AcceptDepositOnlyAsync(accountId, amount);
+        await Pipeline.DrainAsync();
+        return await OperationAsync(accepted.OperationId);
+    }
+
+    public async Task<OperationView> WithdrawAsync(Guid accountId, decimal amount)
+    {
+        var accepted = await AcceptWithdrawalOnlyAsync(accountId, amount);
+        await Pipeline.DrainAsync();
+        return await OperationAsync(accepted.OperationId);
+    }
+
+    public async Task<OperationView> TransferAsync(Guid sourceAccountId, Guid destinationAccountId, decimal amount)
+    {
+        var accepted = await AcceptTransferOnlyAsync(sourceAccountId, destinationAccountId, amount);
+        await Pipeline.DrainAsync();
+        return await OperationAsync(accepted.OperationId);
+    }
+
+    public Task<OperationView> OperationAsync(Guid operationId)
+    {
+        using var unitOfWork = Database.CreateUnitOfWork();
+        return new GetOperationUseCase(unitOfWork.Operations).ExecuteAsync(operationId, CancellationToken.None);
     }
 
     public Task<StatementPage> StatementAsync(Guid accountId, string? cursor = null, int? limit = null)
@@ -80,17 +125,6 @@ internal sealed class WalletHarness
         }
 
         return account.Id;
-    }
-
-    public async Task<TransferResult> TransferAsync(Guid sourceAccountId, Guid destinationAccountId, decimal amount)
-    {
-        // The unit of work must outlive the await: disposing it earlier would release its row locks too soon.
-        // Disposal also releases the locks when the transfer is rejected.
-        using var unitOfWork = Database.CreateUnitOfWork();
-        var useCase = new TransferUseCase(unitOfWork.Accounts, unitOfWork.Transactions, unitOfWork, Clock);
-        return await useCase.ExecuteAsync(
-            new TransferCommand(sourceAccountId, destinationAccountId, amount),
-            CancellationToken.None);
     }
 
     public async Task BlockAccountAsync(Guid accountId)
