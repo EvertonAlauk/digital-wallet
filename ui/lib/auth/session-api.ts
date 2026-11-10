@@ -37,3 +37,18 @@ export async function fetchSession(): Promise<SessionUser | null> {
 export async function logoutRequest(): Promise<void> {
   await apiFetch<void>("/bff/logout", { method: "POST", body: {}, handleUnauthorized: false });
 }
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
+
+/**
+ * Creates an account. The BFF does not sign the user in: the caller sends them to the login page.
+ * A 409 (email taken) is an ordinary answer here, so it is not treated as "send to login".
+ */
+export async function registerRequest(request: RegisterRequest): Promise<void> {
+  await apiFetch<void>("/bff/register", { method: "POST", body: request, handleUnauthorized: false });
+}

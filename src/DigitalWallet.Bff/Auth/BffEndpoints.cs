@@ -43,7 +43,59 @@ public static class BffEndpoints
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status415UnsupportedMediaType);
 
+        group.MapPost("/register", RegisterAsync)
+            .WithName("Register")
+            .AllowAnonymous()
+            .RequireRateLimiting(RateLimitPolicies.Login)
+            .AddEndpointFilter<CsrfFilter>()
+            .Produces(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status415UnsupportedMediaType)
+            .ProducesProblem(StatusCodes.Status429TooManyRequests);
+
         return app;
+    }
+
+    /// <summary>
+    /// Creates an account. The response does not sign the user in: the frontend sends them to the login page.
+    /// Registration shares the login's rate limit, because it is the other place where guessing is possible.
+    /// </summary>
+    private static async Task<IResult> RegisterAsync(
+        RegisterRequest request,
+        IUserRegistrationService registration,
+        CancellationToken cancellationToken)
+    {
+        var (account, errors) = RegistrationRules.Check(request.Email, request.Password, request.FirstName, request.LastName);
+        if (account is null)
+        {
+            return Results.ValidationProblem(
+                errors.ToDictionary(pair => pair.Key, pair => pair.Value),
+                title: "Invalid request");
+        }
+
+        var result = await registration.RegisterAsync(account, cancellationToken);
+        return result.Outcome switch
+        {
+            RegistrationOutcome.Created => Results.StatusCode(StatusCodes.Status201Created),
+            RegistrationOutcome.AlreadyExists => Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Account already exists",
+                detail: "An account with this email already exists. Sign in instead."),
+            RegistrationOutcome.Rejected => Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid request",
+                detail: "The identity provider did not accept these details. Check the password and try again."),
+            RegistrationOutcome.Misconfigured => Results.Problem(
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "Registration is misconfigured",
+                detail: "The BFF could not create accounts in the identity provider."),
+            _ => Results.Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                title: "Identity provider unavailable",
+                detail: "Accounts cannot be created right now. Try again."),
+        };
     }
 
     private static async Task<IResult> LoginAsync(
@@ -140,6 +192,8 @@ public static class BffEndpoints
 }
 
 public sealed record LoginRequest(string Username, string Password);
+
+public sealed record RegisterRequest(string? Email, string? Password, string? FirstName, string? LastName);
 
 public sealed record LoginResponse(SessionUser User);
 
