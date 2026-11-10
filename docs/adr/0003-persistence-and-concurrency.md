@@ -1,8 +1,5 @@
 # ADR 0003: Persistence ports, optimistic concurrency, and PostgreSQL mapping
 
-- **Status:** Accepted
-- **Date:** 2026-11-09
-
 ## Context
 
 Use cases must change accounts and append transactions atomically, and two operations must never silently

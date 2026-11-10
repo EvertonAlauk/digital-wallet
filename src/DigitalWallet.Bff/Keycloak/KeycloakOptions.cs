@@ -1,0 +1,43 @@
+namespace DigitalWallet.Bff.Keycloak;
+
+/// <summary>
+/// Keycloak connection settings. <see cref="ClientSecret"/> must come from the environment or user secrets,
+/// never from the repository.
+/// </summary>
+public sealed class KeycloakOptions
+{
+    public const string SectionName = "Keycloak";
+
+    public string TokenEndpoint { get; init; } = string.Empty;
+
+    public string LogoutEndpoint { get; init; } = string.Empty;
+
+    public string ClientId { get; init; } = string.Empty;
+
+    public string ClientSecret { get; init; } = string.Empty;
+
+    /// <summary>Throws when a setting is missing, so the BFF does not start half-configured.</summary>
+    public void Validate()
+    {
+        if (!Uri.TryCreate(TokenEndpoint, UriKind.Absolute, out _))
+        {
+            throw new InvalidOperationException("Keycloak:TokenEndpoint must be an absolute URL.");
+        }
+
+        if (!Uri.TryCreate(LogoutEndpoint, UriKind.Absolute, out _))
+        {
+            throw new InvalidOperationException("Keycloak:LogoutEndpoint must be an absolute URL.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ClientId))
+        {
+            throw new InvalidOperationException("Keycloak:ClientId is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(ClientSecret))
+        {
+            throw new InvalidOperationException(
+                "Keycloak:ClientSecret is required. Set it through the environment or user secrets, not in appsettings.");
+        }
+    }
+}

@@ -1,5 +1,8 @@
+using System.Security.Claims;
+using DigitalWallet.Api.Auth;
 using DigitalWallet.Api.Common.Idempotency;
 using DigitalWallet.Api.Features.Operations;
+using DigitalWallet.Application.Accounts;
 using DigitalWallet.Application.Operations;
 
 namespace DigitalWallet.Api.Features.Transfers;
@@ -23,9 +26,14 @@ public static class TransferEndpoints
 
     private static async Task<IResult> TransferAsync(
         TransferRequest request,
+        ClaimsPrincipal user,
+        GetAccountUseCase accounts,
         AcceptTransferUseCase useCase,
         CancellationToken cancellationToken)
     {
+        // Only the source account must belong to the caller. The destination can be any account.
+        await AccountOwnership.EnsureOwnedAsync(request.SourceAccountId, user, accounts, cancellationToken);
+
         var accepted = await useCase.ExecuteAsync(
             new AcceptTransferCommand(request.SourceAccountId, request.DestinationAccountId, request.Amount),
             cancellationToken);

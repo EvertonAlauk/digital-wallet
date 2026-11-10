@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using DigitalWallet.Api.Auth;
+using DigitalWallet.Application.Accounts;
 using DigitalWallet.Application.Operations;
 
 namespace DigitalWallet.Api.Features.Operations;
@@ -16,12 +19,16 @@ public static class OperationEndpoints
         return app;
     }
 
+    // An operation is visible to the owner of its account. For anyone else it does not exist.
     private static async Task<IResult> GetOperationAsync(
         Guid id,
+        ClaimsPrincipal user,
         GetOperationUseCase useCase,
+        GetAccountUseCase accounts,
         CancellationToken cancellationToken)
     {
         var operation = await useCase.ExecuteAsync(id, cancellationToken);
+        await AccountOwnership.EnsureOwnedAsync(operation.AccountId, user, accounts, cancellationToken);
 
         return Results.Ok(OperationResponse.From(operation));
     }
@@ -38,6 +45,7 @@ public sealed record OperationAcceptedResponse(Guid OperationId, string Status)
 
 public sealed record OperationResponse(
     Guid Id,
+    Guid AccountId,
     string Kind,
     string Status,
     string? FailureReason,
@@ -47,6 +55,7 @@ public sealed record OperationResponse(
 {
     public static OperationResponse From(OperationView operation) => new(
         operation.Id,
+        operation.AccountId,
         operation.Kind,
         operation.Status,
         operation.FailureReason,

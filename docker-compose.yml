@@ -33,6 +33,25 @@ services:
       timeout: 10s
       retries: 10
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    container_name: digital-wallet-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: wallet-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      # Fixes the issuer ("iss") of every token, whatever address the caller used to reach Keycloak.
+      KC_HOSTNAME: http://localhost:8081
+      # Containers reach Keycloak at keycloak:8080 for keys and token calls. Their URLs must use that address,
+      # while the issuer stays fixed by KC_HOSTNAME.
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      # Read by the realm import (infra/keycloak/realm-digital-wallet.json), so the secret is not in the repository.
+      BFF_CLIENT_SECRET: ${BFF_CLIENT_SECRET}
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./infra/keycloak:/opt/keycloak/data/import:ro
+
   api:
     build: .
     container_name: digital-wallet-api
@@ -44,11 +63,34 @@ services:
       RabbitMq__Host: "rabbitmq"
       RabbitMq__Username: "wallet"
       RabbitMq__Password: "wallet"
+      # The issuer must match the token's "iss" (KC_HOSTNAME); the metadata is fetched over the internal network.
+      Auth__Authority: "http://localhost:8081/realms/digital-wallet"
+      Auth__MetadataAddress: "http://keycloak:8080/realms/digital-wallet/.well-known/openid-configuration"
+      Auth__Audience: "digital-wallet-api"
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      keycloak:
+        condition: service_started
+
+  bff:
+    build:
+      context: .
+      dockerfile: src/DigitalWallet.Bff/Dockerfile
+    container_name: digital-wallet-bff
+    ports:
+      - "8082:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Keycloak__TokenEndpoint: "http://keycloak:8080/realms/digital-wallet/protocol/openid-connect/token"
+      Keycloak__LogoutEndpoint: "http://keycloak:8080/realms/digital-wallet/protocol/openid-connect/logout"
+      Keycloak__ClientId: "digital-wallet-bff"
+      Keycloak__ClientSecret: ${BFF_CLIENT_SECRET}
+    depends_on:
+      keycloak:
+        condition: service_started
 
 volumes:
   pgdata:

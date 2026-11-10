@@ -1,8 +1,5 @@
 # ADR 0006: Idempotency-Key for money movements
 
-- **Status:** Accepted
-- **Date:** 2026-11-10
-
 ## Context
 
 A client that retries a deposit, withdrawal or transfer after a timeout cannot tell whether the first request was processed. Without protection, the retry moves money a second time. Each movement must be processed at most once per key, and a retry must receive the original outcome.

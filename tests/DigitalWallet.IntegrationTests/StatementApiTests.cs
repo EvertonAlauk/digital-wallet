@@ -62,7 +62,7 @@ public class StatementApiTests(WalletApiFactory factory) : IClassFixture<WalletA
 
     private async Task<AccountResponse> CreateAccountAsync()
     {
-        var response = await _api.PostAccountAsync(Guid.NewGuid());
+        var response = await _api.PostAccountAsync();
         return (await response.Content.ReadFromJsonAsync<AccountResponse>())!;
     }
 }

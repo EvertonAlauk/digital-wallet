@@ -1,0 +1,99 @@
+{
+  "realm": "digital-wallet",
+  "enabled": true,
+  "displayName": "Digital Wallet",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "failureFactor": 5,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "waitIncrementSeconds": 60,
+  "maxDeltaTimeSeconds": 43200,
+  "accessTokenLifespan": 300,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      { "name": "user", "description": "A wallet customer" },
+      { "name": "admin", "description": "Read access to any account, for support" }
+    ]
+  },
+  "users": [
+    {
+      "id": "a1ce0000-0000-4000-8000-000000000001",
+      "username": "alice",
+      "email": "alice@digital-wallet.test",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Customer",
+      "realmRoles": ["user"],
+      "credentials": [
+        { "type": "password", "value": "alice-dev-password", "temporary": false }
+      ]
+    },
+    {
+      "id": "b0b00000-0000-4000-8000-000000000002",
+      "username": "bob",
+      "email": "bob@digital-wallet.test",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Bob",
+      "lastName": "Customer",
+      "realmRoles": ["user"],
+      "credentials": [
+        { "type": "password", "value": "bob-dev-password", "temporary": false }
+      ]
+    },
+    {
+      "id": "ad000000-0000-4000-8000-000000000003",
+      "username": "admin",
+      "email": "admin@digital-wallet.test",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Wallet",
+      "lastName": "Admin",
+      "realmRoles": ["admin"],
+      "credentials": [
+        { "type": "password", "value": "admin-dev-password", "temporary": false }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "digital-wallet-bff",
+      "name": "Digital Wallet BFF",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${BFF_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [],
+      "webOrigins": [],
+      "protocolMappers": [
+        {
+          "name": "digital-wallet-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "digital-wallet-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,8 @@
+using System.Security.Claims;
+using DigitalWallet.Api.Auth;
 using DigitalWallet.Api.Common.Idempotency;
 using DigitalWallet.Api.Features.Operations;
+using DigitalWallet.Application.Accounts;
 using DigitalWallet.Application.Operations;
 
 namespace DigitalWallet.Api.Features.Movements;
@@ -33,9 +36,12 @@ public static class MovementEndpoints
     private static async Task<IResult> DepositAsync(
         Guid id,
         MovementRequest request,
+        ClaimsPrincipal user,
+        GetAccountUseCase accounts,
         AcceptDepositUseCase useCase,
         CancellationToken cancellationToken)
     {
+        await AccountOwnership.EnsureOwnedAsync(id, user, accounts, cancellationToken);
         var accepted = await useCase.ExecuteAsync(new AcceptDepositCommand(id, request.Amount), cancellationToken);
 
         return OperationAcceptedResponse.ToResult(accepted);
@@ -44,9 +50,12 @@ public static class MovementEndpoints
     private static async Task<IResult> WithdrawAsync(
         Guid id,
         MovementRequest request,
+        ClaimsPrincipal user,
+        GetAccountUseCase accounts,
         AcceptWithdrawalUseCase useCase,
         CancellationToken cancellationToken)
     {
+        await AccountOwnership.EnsureOwnedAsync(id, user, accounts, cancellationToken);
         var accepted = await useCase.ExecuteAsync(new AcceptWithdrawalCommand(id, request.Amount), cancellationToken);
 
         return OperationAcceptedResponse.ToResult(accepted);

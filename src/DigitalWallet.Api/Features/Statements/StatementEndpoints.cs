@@ -1,3 +1,6 @@
+using System.Security.Claims;
+using DigitalWallet.Api.Auth;
+using DigitalWallet.Application.Accounts;
 using DigitalWallet.Application.Statements;
 
 namespace DigitalWallet.Api.Features.Statements;
@@ -22,9 +25,13 @@ public static class StatementEndpoints
         Guid id,
         string? cursor,
         int? limit,
+        ClaimsPrincipal user,
+        GetAccountUseCase accounts,
         GetStatementUseCase useCase,
         CancellationToken cancellationToken)
     {
+        await AccountOwnership.EnsureOwnedAsync(id, user, accounts, cancellationToken);
+
         var page = await useCase.ExecuteAsync(new GetStatementQuery(id, cursor, limit), cancellationToken);
 
         return Results.Ok(StatementResponse.From(page));

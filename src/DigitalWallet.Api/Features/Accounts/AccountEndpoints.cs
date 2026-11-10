@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using DigitalWallet.Api.Auth;
 using DigitalWallet.Application.Accounts;
 
 namespace DigitalWallet.Api.Features.Accounts;
@@ -8,41 +10,43 @@ public static class AccountEndpoints
     {
         var group = app.MapGroup("/accounts").WithTags("Accounts");
 
+        // The owner is the caller's "sub" claim. The request body cannot choose it.
         group.MapPost("/", CreateAccountAsync)
             .WithName("CreateAccount")
             .Produces<AccountResponse>(StatusCodes.Status201Created)
-            .ProducesValidationProblem();
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         group.MapGet("/{id:guid}", GetAccountAsync)
             .WithName("GetAccount")
             .Produces<AccountResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         return app;
     }
 
     private static async Task<IResult> CreateAccountAsync(
-        CreateAccountRequest request,
+        ClaimsPrincipal user,
         CreateAccountUseCase useCase,
         CancellationToken cancellationToken)
     {
-        var account = await useCase.ExecuteAsync(new CreateAccountCommand(request.OwnerId), cancellationToken);
+        var account = await useCase.ExecuteAsync(new CreateAccountCommand(user.GetUserId()), cancellationToken);
 
         return Results.Created($"/accounts/{account.Id}", AccountResponse.From(account));
     }
 
     private static async Task<IResult> GetAccountAsync(
         Guid id,
+        ClaimsPrincipal user,
         GetAccountUseCase useCase,
         CancellationToken cancellationToken)
     {
         var account = await useCase.ExecuteAsync(id, cancellationToken);
+        AccountOwnership.EnsureOwned(account, user);
 
         return Results.Ok(AccountResponse.From(account));
     }
 }
-
-public sealed record CreateAccountRequest(Guid OwnerId);
 
 public sealed record AccountResponse(
     Guid Id,

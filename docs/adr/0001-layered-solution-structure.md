@@ -1,8 +1,5 @@
 # ADR 0001: Layered solution structure
 
-- **Status:** Accepted
-- **Date:** 2026-11-09
-
 ## Context
 
 The digital wallet must separate business rules, use cases, infrastructure (PostgreSQL, messaging) and

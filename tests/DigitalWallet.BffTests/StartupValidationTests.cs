@@ -1,0 +1,56 @@
+using DigitalWallet.Bff.Keycloak;
+using FluentAssertions;
+
+namespace DigitalWallet.BffTests;
+
+public class StartupValidationTests
+{
+    private static KeycloakOptions Valid() => new()
+    {
+        TokenEndpoint = "https://idp.example/token",
+        LogoutEndpoint = "https://idp.example/logout",
+        ClientId = "digital-wallet-bff",
+        ClientSecret = "from-the-environment",
+    };
+
+    [Fact]
+    public void ValidOptions_PassValidation()
+    {
+        var act = () => Valid().Validate();
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void MissingClientSecret_FailsAtStartup()
+    {
+        var options = Valid();
+        options = new KeycloakOptions
+        {
+            TokenEndpoint = options.TokenEndpoint,
+            LogoutEndpoint = options.LogoutEndpoint,
+            ClientId = options.ClientId,
+            ClientSecret = string.Empty,
+        };
+
+        var act = () => options.Validate();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*ClientSecret*");
+    }
+
+    [Fact]
+    public void RelativeTokenEndpoint_FailsAtStartup()
+    {
+        var options = new KeycloakOptions
+        {
+            TokenEndpoint = "/token",
+            LogoutEndpoint = "https://idp.example/logout",
+            ClientId = "digital-wallet-bff",
+            ClientSecret = "x",
+        };
+
+        var act = () => options.Validate();
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*TokenEndpoint*");
+    }
+}

@@ -29,7 +29,7 @@ public class ConcurrentTransfersTests(WalletApiFactory factory) : IClassFixture<
         var accounts = new List<Guid>();
         for (var index = 0; index < AccountCount; index++)
         {
-            var created = (await (await api.PostAccountAsync(Guid.NewGuid())).Content.ReadFromJsonAsync<AccountResponse>())!;
+            var created = (await (await api.PostAccountAsync()).Content.ReadFromJsonAsync<AccountResponse>())!;
             await api.FundAsync(created.Id, InitialBalance);
             accounts.Add(created.Id);
         }

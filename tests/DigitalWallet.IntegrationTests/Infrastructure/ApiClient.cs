@@ -1,31 +1,60 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
-using DigitalWallet.Api.Features.Accounts;
 using DigitalWallet.Api.Features.Movements;
 using DigitalWallet.Api.Features.Transfers;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace DigitalWallet.IntegrationTests.Infrastructure;
 
-/// <summary>Typed helper over the test server, so tests read as business steps.</summary>
+/// <summary>
+/// Typed helper over the test server, so tests read as business steps. Each instance acts as one user: its requests
+/// carry a bearer token whose subject is <see cref="UserId"/>.
+/// </summary>
 public sealed class ApiClient
 {
     private readonly HttpClient _http;
     private readonly WalletApiFactory _factory;
 
     public ApiClient(WalletApiFactory factory)
+        : this(factory, Guid.NewGuid(), roles: ["user"])
+    {
+    }
+
+    public ApiClient(WalletApiFactory factory, Guid userId, IEnumerable<string> roles)
     {
         _factory = factory;
+        UserId = userId;
 
         // HTTPS base address avoids the redirect from UseHttpsRedirection.
         _http = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             BaseAddress = new Uri("https://localhost"),
         });
+
+        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            TestTokens.Create(userId, roles));
     }
 
-    public Task<HttpResponseMessage> PostAccountAsync(Guid ownerId) =>
-        _http.PostAsJsonAsync("/accounts", new CreateAccountRequest(ownerId));
+    public Guid UserId { get; }
+
+    public static ApiClient Admin(WalletApiFactory factory) =>
+        new(factory, Guid.NewGuid(), roles: ["admin"]);
+
+    /// <summary>A client that sends no token at all.</summary>
+    public static ApiClient Anonymous(WalletApiFactory factory)
+    {
+        var client = new ApiClient(factory);
+        client.Http.DefaultRequestHeaders.Authorization = null;
+        return client;
+    }
+
+    public HttpClient Http => _http;
+
+    /// <summary>Creates an account owned by this client's user. The owner comes from the token, not from the request.</summary>
+    public Task<HttpResponseMessage> PostAccountAsync() =>
+        _http.PostAsync("/accounts", content: null);
 
     public Task<HttpResponseMessage> GetAccountAsync(Guid accountId) =>
         _http.GetAsync($"/accounts/{accountId}");
@@ -70,6 +99,4 @@ public sealed class ApiClient
 
     public Task<HttpResponseMessage> PostRawJsonAsync(string path, string json) =>
         _http.PostAsync(path, new StringContent(json, Encoding.UTF8, "application/json"));
-
-    public HttpClient Http => _http;
 }

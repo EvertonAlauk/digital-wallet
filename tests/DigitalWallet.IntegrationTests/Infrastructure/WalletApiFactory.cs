@@ -1,3 +1,4 @@
+using System.Globalization;
 using DigitalWallet.Application.Idempotency;
 using DigitalWallet.Application.Outbox;
 using DigitalWallet.Application.Ports;
@@ -5,19 +6,22 @@ using DigitalWallet.Application.Operations;
 using DigitalWallet.Infrastructure.Persistence;
 using DigitalWallet.Testing.Fakes;
 using DigitalWallet.Testing.InMemory;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace DigitalWallet.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Runs the real API pipeline (routing, validation, exception mapping, ProblemDetails) with PostgreSQL and RabbitMQ
-/// replaced by in-memory fakes. Background processing is driven explicitly through <see cref="DrainAsync"/>.
+/// Runs the real API pipeline (routing, authentication, authorization, validation, exception mapping, ProblemDetails)
+/// with PostgreSQL and RabbitMQ replaced by in-memory fakes. Tokens are signed locally (see <see cref="TestTokens"/>).
+/// Background processing is driven explicitly through <see cref="DrainAsync"/>.
 /// </summary>
-public sealed class WalletApiFactory : WebApplicationFactory<Program>
+public class WalletApiFactory : WebApplicationFactory<Program>
 {
     public static readonly DateTimeOffset StartTime = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
@@ -26,6 +30,9 @@ public sealed class WalletApiFactory : WebApplicationFactory<Program>
     public FakeClock Clock { get; } = new(StartTime);
 
     public InMemoryPipeline Pipeline { get; private set; } = null!;
+
+    /// <summary>Requests per minute per user. Subclasses lower it to test the rate limit.</summary>
+    public virtual int RateLimitPermitLimit => 100_000;
 
     /// <summary>Relays pending outbox messages through the handlers until nothing is left.</summary>
     public Task DrainAsync() => Pipeline.DrainAsync();
@@ -36,10 +43,19 @@ public sealed class WalletApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Postgres", "Host=unused;Database=unused");
         builder.UseSetting("RabbitMq:Host", "unused");
+        builder.UseSetting("RateLimit:PermitLimit", RateLimitPermitLimit.ToString(CultureInfo.InvariantCulture));
 
         builder.ConfigureTestServices(services =>
         {
             Pipeline = new InMemoryPipeline(Database, Clock);
+
+            // Trust only the test key, issuer and audience. No metadata is fetched from a real identity provider.
+            services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+            {
+                options.TokenValidationParameters.IssuerSigningKey = TestTokens.SigningKey;
+                options.TokenValidationParameters.ValidIssuer = TestTokens.Issuer;
+                options.TokenValidationParameters.ValidAudience = TestTokens.Audience;
+            });
 
             services.RemoveAll<WalletDbContext>();
             services.RemoveAll<IAccountRepository>();
@@ -69,4 +85,10 @@ public sealed class WalletApiFactory : WebApplicationFactory<Program>
             services.AddScoped<IOutboxStore>(_ => new InMemoryOutboxStore(Database));
         });
     }
+}
+
+/// <summary>A factory with a tiny rate limit, for the rate limit tests.</summary>
+public sealed class LowRateLimitFactory : WalletApiFactory
+{
+    public override int RateLimitPermitLimit => 3;
 }

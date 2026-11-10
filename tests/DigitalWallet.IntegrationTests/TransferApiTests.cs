@@ -71,7 +71,7 @@ public class TransferApiTests(WalletApiFactory factory) : IClassFixture<WalletAp
 
     private async Task<Guid> CreateAccountAsync()
     {
-        var response = await _api.PostAccountAsync(Guid.NewGuid());
+        var response = await _api.PostAccountAsync();
         return (await response.Content.ReadFromJsonAsync<AccountResponse>())!.Id;
     }
 
