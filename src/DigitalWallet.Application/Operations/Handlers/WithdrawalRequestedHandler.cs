@@ -48,10 +48,6 @@ public sealed class WithdrawalRequestedHandler(
         {
             operation.Reject(rejection, clock.UtcNow);
             await operations.UpdateAsync(operation, cancellationToken);
-            outbox.Enqueue(OutboxMessage.Create(
-                nameof(WithdrawalRejected),
-                new WithdrawalRejected(requested.OperationId, requested.AccountId, rejection),
-                clock.UtcNow));
         }
 
         await unitOfWork.CommitAsync(cancellationToken);

@@ -1,9 +1,7 @@
-using DigitalWallet.Application.Notifications;
 using DigitalWallet.Application.Operations;
 using DigitalWallet.Application.Operations.Handlers;
 using DigitalWallet.Application.Outbox;
 using DigitalWallet.Application.Ports;
-using DigitalWallet.Domain.Events;
 
 namespace DigitalWallet.Testing.InMemory;
 
@@ -18,11 +16,7 @@ public sealed class InMemoryPipeline
     private readonly IClock _clock;
     private readonly Dictionary<string, Func<InMemoryUnitOfWork, IMessageHandler>> _handlers;
 
-    public InMemoryPipeline(
-        InMemoryDatabase database,
-        IClock clock,
-        INotificationSender sender,
-        IProcessedMessageStore processedMessages)
+    public InMemoryPipeline(InMemoryDatabase database, IClock clock)
     {
         _database = database;
         _clock = clock;
@@ -30,15 +24,11 @@ public sealed class InMemoryPipeline
         _handlers = new Dictionary<string, Func<InMemoryUnitOfWork, IMessageHandler>>
         {
             [nameof(DepositRequested)] = uow => new DepositRequestedHandler(uow.Accounts, uow.Operations, uow.Outbox, uow, clock),
-            [nameof(DepositCreated)] = uow => new DepositCreatedHandler(uow.Accounts, uow.Transactions, uow.Operations, uow.Outbox, uow, clock),
+            [nameof(DepositCreated)] = uow => new DepositCreatedHandler(uow.Accounts, uow.Transactions, uow.Operations, uow, clock),
             [nameof(WithdrawalRequested)] = uow => new WithdrawalRequestedHandler(uow.Accounts, uow.Operations, uow.Outbox, uow, clock),
-            [nameof(WithdrawalCreated)] = uow => new WithdrawalCreatedHandler(uow.Accounts, uow.Transactions, uow.Operations, uow.Outbox, uow, clock),
+            [nameof(WithdrawalCreated)] = uow => new WithdrawalCreatedHandler(uow.Accounts, uow.Transactions, uow.Operations, uow, clock),
             [nameof(TransferRequested)] = uow => new TransferRequestedHandler(uow.Accounts, uow.Operations, uow.Outbox, uow, clock),
-            [nameof(TransferCreated)] = uow => new TransferCreatedHandler(uow.Accounts, uow.Transactions, uow.Operations, uow.Outbox, uow, clock),
-            [nameof(TransferCompleted)] = _ => new TransferNotificationHandler(processedMessages, sender),
-            [nameof(DepositRejected)] = _ => new OperationRejectedHandler(nameof(DepositRejected), processedMessages, sender),
-            [nameof(WithdrawalRejected)] = _ => new OperationRejectedHandler(nameof(WithdrawalRejected), processedMessages, sender),
-            [nameof(TransferRejected)] = _ => new OperationRejectedHandler(nameof(TransferRejected), processedMessages, sender),
+            [nameof(TransferCreated)] = uow => new TransferCreatedHandler(uow.Accounts, uow.Transactions, uow.Operations, uow, clock),
         };
 
         Publisher = new DispatchingPublisher(this);

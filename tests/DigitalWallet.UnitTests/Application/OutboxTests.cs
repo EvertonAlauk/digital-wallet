@@ -1,7 +1,6 @@
 using DigitalWallet.Application.Common;
 using DigitalWallet.Application.Operations;
 using DigitalWallet.Application.Outbox;
-using DigitalWallet.Domain.Events;
 using DigitalWallet.Testing.Fakes;
 using DigitalWallet.Testing.InMemory;
 using FluentAssertions;

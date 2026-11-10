@@ -1,5 +1,4 @@
 using DigitalWallet.Application.Idempotency;
-using DigitalWallet.Application.Notifications;
 using DigitalWallet.Application.Operations;
 using DigitalWallet.Application.Outbox;
 using DigitalWallet.Application.Ports;
@@ -39,9 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
         services.AddScoped<IOutbox, OutboxWriter>();
         services.AddScoped<IOutboxStore, OutboxStore>();
-        services.AddScoped<IProcessedMessageStore, ProcessedMessageStore>();
         services.AddScoped<IOperationRepository, OperationRepository>();
-        services.AddScoped<INotificationSender, LogNotificationSender>();
         services.AddSingleton<IClock, SystemClock>();
 
         return services;

@@ -83,7 +83,6 @@ public class MovementUseCaseTests
         operation.Status.Should().Be(OperationStatus.Rejected.ToString());
         operation.FailureReason.Should().Be("The account is blocked.");
         harness.Database.GetAccount(accountId)!.Balance.Should().Be(Money.Brl(10m));
-        harness.Notifications.Sent.Should().ContainSingle(n => n.Text.Contains("was rejected"));
     }
 
     [Fact]

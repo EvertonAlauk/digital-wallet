@@ -1,7 +1,6 @@
 using DigitalWallet.Application.Common;
 using DigitalWallet.Application.Operations;
 using DigitalWallet.Domain.Enums;
-using DigitalWallet.Domain.Events;
 using DigitalWallet.Domain.Exceptions;
 using DigitalWallet.Domain.ValueObjects;
 using FluentAssertions;
@@ -14,7 +13,7 @@ public class TransferUseCaseTests
     private static readonly TimeSpan DeadlockGuard = TimeSpan.FromSeconds(30);
 
     [Fact]
-    public async Task Transfer_CompletesWithBothBalancesAndPublishesTransferCompleted()
+    public async Task Transfer_CompletesWithBothBalances()
     {
         var harness = await WalletHarness.CreateAsync();
         var source = await harness.CreateFundedAccountAsync(100m);
@@ -32,7 +31,7 @@ public class TransferUseCaseTests
         transaction.Entries.Sum(entry => entry.Amount.Amount).Should().Be(0m);
 
         harness.Database.OutboxMessages.Should().Contain(m =>
-            m.Message.Type == nameof(TransferCompleted) && m.PublishedAt != null);
+            m.Message.Type == nameof(TransferCreated) && m.PublishedAt != null);
     }
 
     [Fact]
@@ -61,7 +60,7 @@ public class TransferUseCaseTests
         operation.FailureReason.Should().Be("Insufficient funds.");
         harness.Database.GetAccount(source)!.Balance.Should().Be(Money.Brl(50m));
         harness.Database.GetAccount(destination)!.Balance.Should().Be(Money.Brl(0m));
-        harness.Database.OutboxMessages.Should().NotContain(m => m.Message.Type == nameof(TransferCompleted));
+        harness.Database.OutboxMessages.Should().NotContain(m => m.Message.Type == nameof(TransferCreated));
     }
 
     [Fact]

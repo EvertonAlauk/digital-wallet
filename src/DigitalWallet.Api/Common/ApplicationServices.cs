@@ -1,6 +1,5 @@
 using DigitalWallet.Application.Accounts;
 using DigitalWallet.Application.Idempotency;
-using DigitalWallet.Application.Notifications;
 using DigitalWallet.Application.Operations;
 using DigitalWallet.Application.Operations.Handlers;
 using DigitalWallet.Application.Outbox;
@@ -33,19 +32,6 @@ internal static class ApplicationServices
         services.AddScoped<IMessageHandler, DepositCreatedHandler>();
         services.AddScoped<IMessageHandler, WithdrawalCreatedHandler>();
         services.AddScoped<IMessageHandler, TransferCreatedHandler>();
-        services.AddScoped<IMessageHandler, TransferNotificationHandler>();
-        services.AddScoped<IMessageHandler>(provider => new OperationRejectedHandler(
-            nameof(DepositRejected),
-            provider.GetRequiredService<IProcessedMessageStore>(),
-            provider.GetRequiredService<INotificationSender>()));
-        services.AddScoped<IMessageHandler>(provider => new OperationRejectedHandler(
-            nameof(WithdrawalRejected),
-            provider.GetRequiredService<IProcessedMessageStore>(),
-            provider.GetRequiredService<INotificationSender>()));
-        services.AddScoped<IMessageHandler>(provider => new OperationRejectedHandler(
-            nameof(TransferRejected),
-            provider.GetRequiredService<IProcessedMessageStore>(),
-            provider.GetRequiredService<INotificationSender>()));
 
         return services;
     }

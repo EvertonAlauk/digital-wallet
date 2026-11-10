@@ -52,10 +52,6 @@ public sealed class TransferRequestedHandler(
         {
             operation.Reject(rejection, clock.UtcNow);
             await operations.UpdateAsync(operation, cancellationToken);
-            outbox.Enqueue(OutboxMessage.Create(
-                nameof(TransferRejected),
-                new TransferRejected(requested.OperationId, requested.SourceAccountId, rejection),
-                clock.UtcNow));
         }
 
         await unitOfWork.CommitAsync(cancellationToken);

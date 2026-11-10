@@ -50,12 +50,9 @@ public sealed class DepositRequestedHandler(
         }
         else
         {
+            // The rejection is recorded on the operation, which the client reads through GET /operations/{id}.
             operation.Reject(rejection, clock.UtcNow);
             await operations.UpdateAsync(operation, cancellationToken);
-            outbox.Enqueue(OutboxMessage.Create(
-                nameof(DepositRejected),
-                new DepositRejected(requested.OperationId, requested.AccountId, rejection),
-                clock.UtcNow));
         }
 
         await unitOfWork.CommitAsync(cancellationToken);

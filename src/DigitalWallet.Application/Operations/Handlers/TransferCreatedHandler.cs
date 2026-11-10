@@ -4,20 +4,18 @@ using DigitalWallet.Application.Outbox;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Domain.Entities;
 using DigitalWallet.Domain.Enums;
-using DigitalWallet.Domain.Events;
 using DigitalWallet.Domain.Exceptions;
 
 namespace DigitalWallet.Application.Operations.Handlers;
 
 /// <summary>
 /// The step that moves money for a transfer. Locks both accounts in ascending id order (ADR 0005), then reads the
-/// operation. On success it also writes TransferCompleted to the outbox, for notifications (ADR 0007).
+/// operation. A business rule violation rejects the operation in the same commit.
 /// </summary>
 public sealed class TransferCreatedHandler(
     IAccountRepository accounts,
     ITransactionRepository transactions,
     IOperationRepository operations,
-    IOutbox outbox,
     IUnitOfWork unitOfWork,
     IClock clock) : IMessageHandler
 {
@@ -66,24 +64,10 @@ public sealed class TransferCreatedHandler(
 
             await transactions.AddAsync(transfer, cancellationToken);
             operation.Complete(transfer.Id, clock.UtcNow);
-
-            var completed = new TransferCompleted(
-                transfer.Id,
-                source.Id,
-                destination.Id,
-                created.Amount,
-                "BRL",
-                clock.UtcNow);
-
-            outbox.Enqueue(OutboxMessage.Create(nameof(TransferCompleted), completed, completed.OccurredAt));
         }
         catch (DomainException exception)
         {
             operation.Reject(exception.Message, clock.UtcNow);
-            outbox.Enqueue(OutboxMessage.Create(
-                nameof(TransferRejected),
-                new TransferRejected(created.OperationId, created.SourceAccountId, exception.Message),
-                clock.UtcNow));
         }
 
         await operations.UpdateAsync(operation, cancellationToken);

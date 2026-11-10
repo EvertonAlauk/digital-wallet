@@ -1,5 +1,4 @@
 using DigitalWallet.Application.Idempotency;
-using DigitalWallet.Application.Notifications;
 using DigitalWallet.Application.Outbox;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Application.Operations;
@@ -26,10 +25,6 @@ public sealed class WalletApiFactory : WebApplicationFactory<Program>
 
     public FakeClock Clock { get; } = new(StartTime);
 
-    public InMemoryNotificationSender Notifications { get; } = new();
-
-    public InMemoryProcessedMessageStore ProcessedMessages { get; } = new();
-
     public InMemoryPipeline Pipeline { get; private set; } = null!;
 
     /// <summary>Relays pending outbox messages through the handlers until nothing is left.</summary>
@@ -44,7 +39,7 @@ public sealed class WalletApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
-            Pipeline = new InMemoryPipeline(Database, Clock, Notifications, ProcessedMessages);
+            Pipeline = new InMemoryPipeline(Database, Clock);
 
             services.RemoveAll<WalletDbContext>();
             services.RemoveAll<IAccountRepository>();

@@ -8,7 +8,7 @@ public class MessagingRulesTests
     [Theory]
     [InlineData("DepositCreated", "deposit-created")]
     [InlineData("TransferRequested", "transfer-requested")]
-    [InlineData("TransferCompleted", "transfer-completed")]
+    [InlineData("TransferCreated", "transfer-created")]
     public void QueueName_IsTheKebabCaseOfTheMessageType(string messageType, string expected)
     {
         QueueNames.For(messageType).Should().Be(expected);

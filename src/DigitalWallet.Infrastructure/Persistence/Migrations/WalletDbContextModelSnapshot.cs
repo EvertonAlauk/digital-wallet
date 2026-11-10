@@ -252,20 +252,6 @@ namespace DigitalWallet.Infrastructure.Persistence.Migrations
                     b.ToTable("outbox_messages", (string)null);
                 });
 
-            modelBuilder.Entity("DigitalWallet.Infrastructure.Persistence.Outbox.ProcessedMessageRecord", b =>
-                {
-                    b.Property<Guid>("MessageId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("ProcessedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("MessageId");
-
-                    b.ToTable("processed_messages", (string)null);
-                });
-
             modelBuilder.Entity("DigitalWallet.Domain.Entities.LedgerEntry", b =>
                 {
                     b.HasOne("DigitalWallet.Domain.Entities.Account", null)

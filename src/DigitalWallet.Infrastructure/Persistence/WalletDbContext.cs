@@ -19,7 +19,6 @@ public sealed class WalletDbContext(DbContextOptions<WalletDbContext> options) :
 
     internal DbSet<OutboxMessageRecord> OutboxMessages => Set<OutboxMessageRecord>();
 
-    internal DbSet<ProcessedMessageRecord> ProcessedMessages => Set<ProcessedMessageRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

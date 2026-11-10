@@ -15,7 +15,6 @@ public sealed class WithdrawalCreatedHandler(
     IAccountRepository accounts,
     ITransactionRepository transactions,
     IOperationRepository operations,
-    IOutbox outbox,
     IUnitOfWork unitOfWork,
     IClock clock) : IMessageHandler
 {
@@ -68,10 +67,6 @@ public sealed class WithdrawalCreatedHandler(
         catch (DomainException exception)
         {
             operation.Reject(exception.Message, clock.UtcNow);
-            outbox.Enqueue(OutboxMessage.Create(
-                nameof(WithdrawalRejected),
-                new WithdrawalRejected(created.OperationId, created.AccountId, exception.Message),
-                clock.UtcNow));
         }
 
         await operations.UpdateAsync(operation, cancellationToken);

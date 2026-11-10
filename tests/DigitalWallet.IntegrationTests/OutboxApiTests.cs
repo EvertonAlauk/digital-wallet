@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using DigitalWallet.Api.Features.Accounts;
 using DigitalWallet.Application.Outbox;
-using DigitalWallet.Domain.Events;
 using DigitalWallet.IntegrationTests.Infrastructure;
 using FluentAssertions;
 
@@ -42,7 +41,7 @@ public class OutboxApiTests(WalletApiFactory factory) : IClassFixture<WalletApiF
     }
 
     [Fact]
-    public async Task CompletedTransfer_PublishesEveryStepAndTheCompletionEvent()
+    public async Task CompletedTransfer_PublishesEveryPipelineStep()
     {
         var source = await CreateAccountAsync();
         var destination = await CreateAccountAsync();
@@ -52,7 +51,6 @@ public class OutboxApiTests(WalletApiFactory factory) : IClassFixture<WalletApiF
         await factory.DrainAsync();
 
         var types = factory.Database.OutboxMessages.Select(m => m.Message.Type).ToList();
-        types.Should().Contain(nameof(TransferCompleted));
         types.Should().Contain(nameof(DigitalWallet.Application.Operations.TransferCreated));
         factory.Database.OutboxMessages.Should().OnlyContain(m => m.PublishedAt != null);
     }

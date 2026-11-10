@@ -19,18 +19,12 @@ internal sealed class WalletHarness
     {
         Database = new InMemoryDatabase();
         Clock = new FakeClock(Now);
-        Notifications = new InMemoryNotificationSender();
-        ProcessedMessages = new InMemoryProcessedMessageStore();
-        Pipeline = new InMemoryPipeline(Database, Clock, Notifications, ProcessedMessages);
+        Pipeline = new InMemoryPipeline(Database, Clock);
     }
 
     public InMemoryDatabase Database { get; }
 
     public FakeClock Clock { get; }
-
-    public InMemoryNotificationSender Notifications { get; }
-
-    public InMemoryProcessedMessageStore ProcessedMessages { get; }
 
     public InMemoryPipeline Pipeline { get; }
 

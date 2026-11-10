@@ -19,7 +19,6 @@ public sealed class DepositCreatedHandler(
     IAccountRepository accounts,
     ITransactionRepository transactions,
     IOperationRepository operations,
-    IOutbox outbox,
     IUnitOfWork unitOfWork,
     IClock clock) : IMessageHandler
 {
@@ -73,10 +72,6 @@ public sealed class DepositCreatedHandler(
         {
             // Validation runs before any ApplyEntry, so no balance was changed.
             operation.Reject(exception.Message, clock.UtcNow);
-            outbox.Enqueue(OutboxMessage.Create(
-                nameof(DepositRejected),
-                new DepositRejected(created.OperationId, created.AccountId, exception.Message),
-                clock.UtcNow));
         }
 
         await operations.UpdateAsync(operation, cancellationToken);
