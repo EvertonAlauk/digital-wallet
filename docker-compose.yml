@@ -94,6 +94,26 @@ services:
       keycloak:
         condition: service_started
 
+  ui:
+    build: ./ui
+    container_name: digital-wallet-ui
+    ports:
+      - "3000:3000"
+    environment:
+      # The browser only talks to this server. /bff/* and /api/* are rewritten to the BFF on the internal network.
+      BFF_URL: "http://bff:8080"
+      # Changes made on the Windows host may not reach the container through the volume, so the dev server polls.
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./ui:/app
+      # Keeps the container's dependencies and build cache out of the host folder.
+      - ui-node-modules:/app/node_modules
+      - ui-next:/app/.next
+    depends_on:
+      - bff
+
 volumes:
   pgdata:
   rabbitmq-data:
+  ui-node-modules:
+  ui-next:

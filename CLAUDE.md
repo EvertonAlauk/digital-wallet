@@ -3,7 +3,7 @@
 Digital wallet API built to study mid/senior-level .NET development.
 Focus: concurrency, consistency, idempotency, testing and observability.
 
-Any code, comment, files names should to be in english.
+Any code, comment, files names should to be in english, both backend and frontend (src and ui folders)
 
 ## Stack
 - .NET (latest installed version), ASP.NET Core Minimal APIs
