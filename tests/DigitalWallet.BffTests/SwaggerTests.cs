@@ -7,7 +7,7 @@ namespace DigitalWallet.BffTests;
 public class SwaggerTests
 {
     [Fact]
-    public async Task InDevelopment_OpenApiDocument_DescribesTheAuthEndpoints()
+    public async Task InDevelopment_OpenApiDocument_DescribesTheBffEndpoints()
     {
         await using var factory = new DevelopmentBffFactory();
         var client = factory.CreateClient();
@@ -16,7 +16,7 @@ public class SwaggerTests
         var document = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        document.Should().Contain("/auth/login").And.Contain("/auth/refresh").And.Contain("/auth/logout");
+        document.Should().Contain("/bff/login").And.Contain("/bff/session").And.Contain("/bff/logout");
     }
 
     [Fact]

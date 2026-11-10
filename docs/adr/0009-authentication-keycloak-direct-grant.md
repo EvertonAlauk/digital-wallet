@@ -78,3 +78,7 @@ Automated tests (no Keycloak, no Docker): the BFF tests use a fake Keycloak hand
 - Replace the dev passwords and the realm import with a managed Keycloak configuration. Use a secret store for `BFF_CLIENT_SECRET`.
 - Keep the BFF logs free of request bodies, because they contain passwords.
 - Brute-force detection is enabled on the realm. It was not exercised in this verification run, so a lockout after repeated wrong passwords is still unverified.
+
+## Update: how the BFF delivers the session
+
+The first BFF returned the tokens to the frontend. [ADR 0010](0010-bff-sessions-and-same-origin-frontend.md) replaces that: the tokens now stay in a server-side session, the browser gets only an opaque `__Host-wallet` cookie, and the BFF endpoints are `/bff/login`, `/bff/session` and `/bff/logout`. The decisions in this ADR about Keycloak, the grant type, the API and the trade-offs still apply.

@@ -1,20 +1,28 @@
-using DigitalWallet.Bff.Keycloak;
+using DigitalWallet.Bff.Identity;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Yarp.ReverseProxy.Forwarder;
 
 namespace DigitalWallet.BffTests.Infrastructure;
 
-/// <summary>Runs the BFF with a fake Keycloak behind its token and logout endpoints.</summary>
+/// <summary>Runs the BFF with a fake identity provider. Subclasses change the environment and the settings for their tests.</summary>
 public class BffFactory : WebApplicationFactory<Program>
 {
     public const string TestClientSecret = "test-client-secret-value";
 
-    public FakeKeycloak Keycloak { get; } = new();
+    public FakeIdentityService Identity { get; } = new();
 
-    /// <summary>The ASP.NET Core environment the BFF runs in. Subclasses change it to test environment-specific behaviour.</summary>
+    public StubApi Api { get; } = new();
+
     protected virtual string EnvironmentName => "Testing";
+
+    protected virtual string LoginPermitLimit => "100000";
+
+    /// <summary>The frontend folder to serve. Null leaves the static frontend disabled, as in production by default.</summary>
+    protected virtual string? UiStaticFilesPath => null;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -23,10 +31,19 @@ public class BffFactory : WebApplicationFactory<Program>
         builder.UseSetting("Keycloak:LogoutEndpoint", "http://keycloak.test/realms/digital-wallet/protocol/openid-connect/logout");
         builder.UseSetting("Keycloak:ClientId", "digital-wallet-bff");
         builder.UseSetting("Keycloak:ClientSecret", TestClientSecret);
+        builder.UseSetting("Api:BaseUrl", "http://api.test");
+        builder.UseSetting("RateLimit:GeneralPermitLimit", "100000");
+        builder.UseSetting("RateLimit:LoginPermitLimit", LoginPermitLimit);
+
+        if (UiStaticFilesPath is { } path)
+        {
+            builder.UseSetting("Ui:StaticFilesPath", path);
+        }
 
         builder.ConfigureTestServices(services =>
         {
-            services.AddHttpClient<KeycloakClient>().ConfigurePrimaryHttpMessageHandler(() => Keycloak);
+            services.Replace(ServiceDescriptor.Singleton<IIdentityService>(Identity));
+            services.Replace(ServiceDescriptor.Singleton<IForwarderHttpClientFactory>(new StubApiForwarderFactory(Api)));
         });
     }
 }

@@ -1,10 +1,34 @@
 using DigitalWallet.Bff.Keycloak;
+using DigitalWallet.Bff.Ui;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 
 namespace DigitalWallet.BffTests;
 
 public class StartupValidationTests
 {
+    [Fact]
+    public void FrontendFolderThatDoesNotExist_FailsAtStartup()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [StaticUi.ConfigurationKey] = "/no/such/folder" })
+            .Build();
+
+        var act = () => StaticUi.Validate(configuration);
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*Ui:StaticFilesPath*");
+    }
+
+    [Fact]
+    public void NoFrontendFolderConfigured_PassesValidation()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+
+        var act = () => StaticUi.Validate(configuration);
+
+        act.Should().NotThrow();
+    }
+
     private static KeycloakOptions Valid() => new()
     {
         TokenEndpoint = "https://idp.example/token",

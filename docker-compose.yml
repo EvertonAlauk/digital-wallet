@@ -88,6 +88,8 @@ services:
       Keycloak__LogoutEndpoint: "http://keycloak:8080/realms/digital-wallet/protocol/openid-connect/logout"
       Keycloak__ClientId: "digital-wallet-bff"
       Keycloak__ClientSecret: ${BFF_CLIENT_SECRET}
+      # /api/* is forwarded to the API over the internal network.
+      Api__BaseUrl: "http://api:8080"
     depends_on:
       keycloak:
         condition: service_started
