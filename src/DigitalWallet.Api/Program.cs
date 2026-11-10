@@ -1,4 +1,5 @@
 using DigitalWallet.Api.Common;
+using DigitalWallet.Api.Common.Idempotency;
 using DigitalWallet.Api.Features.Accounts;
 using DigitalWallet.Api.Features.Movements;
 using DigitalWallet.Api.Features.Statements;
@@ -50,6 +51,7 @@ app.UseExceptionHandler();
 // Error responses that the framework sends without a body (e.g. malformed request bodies) get a ProblemDetails body.
 app.UseStatusCodePages();
 app.UseHttpsRedirection();
+app.UseMiddleware<IdempotencyMiddleware>();
 
 app.MapHealthChecks("/health");
 app.MapAccountEndpoints();

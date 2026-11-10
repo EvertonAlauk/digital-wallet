@@ -1,4 +1,5 @@
 using DigitalWallet.Application.Accounts;
+using DigitalWallet.Application.Idempotency;
 using DigitalWallet.Application.Movements;
 using DigitalWallet.Application.Settlement;
 using DigitalWallet.Application.Statements;
@@ -18,6 +19,7 @@ internal static class ApplicationServices
         services.AddScoped<GetStatementUseCase>();
         services.AddScoped<EnsureSettlementAccountUseCase>();
         services.AddScoped<TransferUseCase>();
+        services.AddScoped<IdempotencyService>();
 
         return services;
     }

@@ -1,3 +1,4 @@
+using DigitalWallet.Api.Common.Idempotency;
 using DigitalWallet.Application.Transfers;
 
 namespace DigitalWallet.Api.Features.Transfers;
@@ -10,6 +11,7 @@ public static class TransferEndpoints
 
         group.MapPost("/", TransferAsync)
             .WithName("Transfer")
+            .WithIdempotency()
             .Produces<TransferResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)

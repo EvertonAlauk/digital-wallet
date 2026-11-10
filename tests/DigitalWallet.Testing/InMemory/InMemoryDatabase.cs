@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using DigitalWallet.Application.Exceptions;
+using DigitalWallet.Application.Idempotency;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Domain.Entities;
 using DigitalWallet.Domain.Enums;
@@ -22,6 +23,63 @@ public sealed class InMemoryDatabase
     private long _lastSequence;
 
     public InMemoryUnitOfWork CreateUnitOfWork() => new(this);
+
+    private readonly Dictionary<string, IdempotencyEntry> _idempotencyKeys = new();
+
+    internal bool TryInsertIdempotencyEntry(IdempotencyEntry entry)
+    {
+        lock (_gate)
+        {
+            if (_idempotencyKeys.ContainsKey(entry.Key))
+            {
+                return false;
+            }
+
+            _idempotencyKeys[entry.Key] = entry;
+            return true;
+        }
+    }
+
+    internal IdempotencyEntry? FindIdempotencyEntry(string key)
+    {
+        lock (_gate)
+        {
+            return _idempotencyKeys.GetValueOrDefault(key);
+        }
+    }
+
+    internal bool DeleteExpiredIdempotencyEntry(string key, DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            if (_idempotencyKeys.TryGetValue(key, out var entry) && entry.ExpiresAt <= now)
+            {
+                _idempotencyKeys.Remove(key);
+                return true;
+            }
+
+            return false;
+        }
+    }
+
+    internal void CompleteIdempotencyEntry(string key, StoredResponse response)
+    {
+        lock (_gate)
+        {
+            if (_idempotencyKeys.TryGetValue(key, out var entry))
+            {
+                _idempotencyKeys[key] = entry with { Response = response };
+            }
+        }
+    }
+
+    internal void DeleteIdempotencyEntry(string key)
+    {
+        lock (_gate)
+        {
+            _idempotencyKeys.Remove(key);
+        }
+    }
 
     /// <summary>The lock that stands in for a row lock on one account. Held until the unit of work commits or is disposed.</summary>
     internal SemaphoreSlim GetRowLock(Guid accountId) =>

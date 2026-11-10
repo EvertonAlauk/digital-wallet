@@ -1,3 +1,4 @@
+using DigitalWallet.Application.Idempotency;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Infrastructure.Persistence;
 using DigitalWallet.Testing.Fakes;
@@ -40,6 +41,8 @@ public sealed class WalletApiFactory : WebApplicationFactory<Program>
             services.AddSingleton(Database);
             services.AddSingleton<IClock>(Clock);
             services.AddSingleton<ILedgerReader>(new InMemoryLedgerReader(Database));
+            services.RemoveAll<IIdempotencyRepository>();
+            services.AddSingleton<IIdempotencyRepository>(new InMemoryIdempotencyRepository(Database));
 
             // One unit of work per HTTP request, as with the EF Core DbContext.
             services.AddScoped<InMemoryUnitOfWork>(_ => Database.CreateUnitOfWork());

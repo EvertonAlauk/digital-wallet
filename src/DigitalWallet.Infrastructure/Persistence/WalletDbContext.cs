@@ -1,4 +1,5 @@
 using DigitalWallet.Domain.Entities;
+using DigitalWallet.Infrastructure.Persistence.Idempotency;
 using Microsoft.EntityFrameworkCore;
 
 namespace DigitalWallet.Infrastructure.Persistence;
@@ -10,6 +11,8 @@ public sealed class WalletDbContext(DbContextOptions<WalletDbContext> options) :
     public DbSet<Transaction> Transactions => Set<Transaction>();
 
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+
+    internal DbSet<IdempotencyKeyRecord> IdempotencyKeys => Set<IdempotencyKeyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

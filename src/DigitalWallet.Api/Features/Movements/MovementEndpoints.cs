@@ -1,3 +1,4 @@
+using DigitalWallet.Api.Common.Idempotency;
 using DigitalWallet.Application.Movements;
 
 namespace DigitalWallet.Api.Features.Movements;
@@ -10,6 +11,7 @@ public static class MovementEndpoints
 
         group.MapPost("/{id:guid}/deposits", DepositAsync)
             .WithName("Deposit")
+            .WithIdempotency()
             .Produces<MovementResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -18,6 +20,7 @@ public static class MovementEndpoints
 
         group.MapPost("/{id:guid}/withdrawals", WithdrawAsync)
             .WithName("Withdraw")
+            .WithIdempotency()
             .Produces<MovementResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
