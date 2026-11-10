@@ -15,6 +15,8 @@ public class BffFactory : WebApplicationFactory<Program>
 
     public FakeIdentityService Identity { get; } = new();
 
+    public FakeUserRegistrationService Registration { get; } = new();
+
     public StubApi Api { get; } = new();
 
     protected virtual string EnvironmentName => "Testing";
@@ -31,6 +33,9 @@ public class BffFactory : WebApplicationFactory<Program>
         builder.UseSetting("Keycloak:LogoutEndpoint", "http://keycloak.test/realms/digital-wallet/protocol/openid-connect/logout");
         builder.UseSetting("Keycloak:ClientId", "digital-wallet-bff");
         builder.UseSetting("Keycloak:ClientSecret", TestClientSecret);
+        builder.UseSetting("Keycloak:RegistrarClientId", "digital-wallet-registrar");
+        builder.UseSetting("Keycloak:RegistrarClientSecret", "test-registrar-secret");
+        builder.UseSetting("Keycloak:AdminBaseUrl", "http://keycloak.test/admin/realms/digital-wallet");
         builder.UseSetting("Api:BaseUrl", "http://api.test");
         builder.UseSetting("RateLimit:GeneralPermitLimit", "100000");
         builder.UseSetting("RateLimit:LoginPermitLimit", LoginPermitLimit);
@@ -43,6 +48,7 @@ public class BffFactory : WebApplicationFactory<Program>
         builder.ConfigureTestServices(services =>
         {
             services.Replace(ServiceDescriptor.Singleton<IIdentityService>(Identity));
+            services.Replace(ServiceDescriptor.Singleton<IUserRegistrationService>(Registration));
             services.Replace(ServiceDescriptor.Singleton<IForwarderHttpClientFactory>(new StubApiForwarderFactory(Api)));
         });
     }

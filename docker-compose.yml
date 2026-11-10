@@ -47,6 +47,8 @@ services:
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       # Read by the realm import (infra/keycloak/realm-digital-wallet.json), so the secret is not in the repository.
       BFF_CLIENT_SECRET: ${BFF_CLIENT_SECRET}
+      # Read by the realm import: the secret of the client that creates user accounts through the Admin API.
+      REGISTRAR_CLIENT_SECRET: ${REGISTRAR_CLIENT_SECRET}
     ports:
       - "8081:8080"
     volumes:
@@ -88,6 +90,9 @@ services:
       Keycloak__LogoutEndpoint: "http://keycloak:8080/realms/digital-wallet/protocol/openid-connect/logout"
       Keycloak__ClientId: "digital-wallet-bff"
       Keycloak__ClientSecret: ${BFF_CLIENT_SECRET}
+      Keycloak__RegistrarClientId: "digital-wallet-registrar"
+      Keycloak__RegistrarClientSecret: ${REGISTRAR_CLIENT_SECRET}
+      Keycloak__AdminBaseUrl: "http://keycloak:8080/admin/realms/digital-wallet"
       # /api/* is forwarded to the API over the internal network.
       Api__BaseUrl: "http://api:8080"
     depends_on:

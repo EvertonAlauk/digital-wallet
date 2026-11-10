@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -12,6 +13,8 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = safeReturnUrl(searchParams.get("returnUrl"));
+  // Set after a successful registration, so the user knows the account exists and can sign in.
+  const justRegistered = searchParams.get("registered") === "1";
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -53,6 +56,12 @@ export function LoginForm() {
       <h1 id="login-title" className={styles.title}>
         Sign in to your wallet
       </h1>
+
+      {justRegistered && (
+        <p role="status" className={styles.notice}>
+          Account created. Sign in with your email and password.
+        </p>
+      )}
 
       <div className={styles.field}>
         <label htmlFor="username">Username</label>
@@ -102,6 +111,8 @@ export function LoginForm() {
       <button type="submit" className={styles.submit} disabled={submitting}>
         {submitting ? "Signing in…" : "Sign in"}
       </button>
+
+      <Link href="/register">Create an account</Link>
     </form>
   );
 }

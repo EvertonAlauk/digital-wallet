@@ -20,6 +20,7 @@ StaticUi.Validate(builder.Configuration);
 
 // The timeout bounds every call to Keycloak, so a slow identity provider cannot hold a request open forever.
 builder.Services.AddHttpClient<IIdentityService, KeycloakIdentityService>(client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddHttpClient<IUserRegistrationService, KeycloakUserRegistrationService>(client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddBffSessions();
 
 // The API that /api/* is forwarded to. Required: a BFF without its API address would fail every proxied request.

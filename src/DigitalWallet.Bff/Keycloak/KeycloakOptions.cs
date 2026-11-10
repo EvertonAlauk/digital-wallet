@@ -18,6 +18,14 @@ public sealed class KeycloakOptions
 
     public string ClientSecret { get; init; } = string.Empty;
 
+    /// <summary>Client that creates user accounts through the Admin API. Its service account has manage-users.</summary>
+    public string RegistrarClientId { get; init; } = string.Empty;
+
+    public string RegistrarClientSecret { get; init; } = string.Empty;
+
+    /// <summary>Base of the Admin REST API of the realm, for example http://localhost:8081/admin/realms/digital-wallet.</summary>
+    public string AdminBaseUrl { get; init; } = string.Empty;
+
     /// <summary>Throws when a setting is missing, so the BFF does not start half-configured.</summary>
     public void Validate()
     {
@@ -40,6 +48,22 @@ public sealed class KeycloakOptions
         {
             throw new InvalidOperationException(
                 "Keycloak:ClientSecret is required. Set it through the environment or user secrets, not in appsettings.");
+        }
+
+        if (!HttpUrl.IsAbsoluteHttp(AdminBaseUrl))
+        {
+            throw new InvalidOperationException("Keycloak:AdminBaseUrl must be an absolute http or https URL.");
+        }
+
+        if (string.IsNullOrWhiteSpace(RegistrarClientId))
+        {
+            throw new InvalidOperationException("Keycloak:RegistrarClientId is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(RegistrarClientSecret))
+        {
+            throw new InvalidOperationException(
+                "Keycloak:RegistrarClientSecret is required. Set it through the environment or user secrets, not in appsettings.");
         }
     }
 }

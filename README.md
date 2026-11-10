@@ -61,6 +61,20 @@ Keycloak imports the realm from `infra/keycloak/realm-digital-wallet.json` on it
 
 These passwords are for local development only.
 
+New users can create an account on **http://localhost:3000/register**. The account is created in Keycloak with the
+`user` role, and the email address is the username. Email verification is not enabled, because the project has no mail
+server.
+
+The registration needs one extra step, after Keycloak has started for the first time: the registrar's service account
+must have the Admin API roles. The realm import does not apply them, so run this once (and again only if Keycloak is
+recreated):
+
+```bash
+bash infra/keycloak/grant-registrar-roles.sh
+```
+
+The script reads `KEYCLOAK_ADMIN_PASSWORD` from `.env` and does not print it. It is safe to run more than once.
+
 ### 3. Run the frontend outside Docker (optional)
 
 The frontend already runs in Compose on port 3000. To run it on the host instead, stop its container first (`docker compose stop ui`), so the port is free:

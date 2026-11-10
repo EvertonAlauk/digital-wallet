@@ -65,7 +65,9 @@ export async function apiFetch<T>(path: string, options: ApiRequestOptions = {})
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  // Some successful responses have no body (for example 201 Created). Only a non-empty body is parsed.
+  const text = await response.text();
+  return (text === "" ? undefined : JSON.parse(text)) as T;
 }
 
 type RedirectHandler = (url: string) => void;
