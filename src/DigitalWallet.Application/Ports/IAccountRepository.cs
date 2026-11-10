@@ -1,4 +1,5 @@
 using DigitalWallet.Domain.Entities;
+using DigitalWallet.Domain.Enums;
 
 namespace DigitalWallet.Application.Ports;
 
@@ -11,8 +12,19 @@ public interface IAccountRepository
 
     Task AddAsync(Account account, CancellationToken cancellationToken);
 
-    /// <summary>Customer accounts of one owner, newest first. Returns at most <paramref name="limit"/> accounts.</summary>
-    Task<IReadOnlyList<Account>> ListByOwnerAsync(Guid ownerId, int limit, CancellationToken cancellationToken);
+    /// <summary>
+    /// Customer accounts of one owner, newest first. Filters by status when given, and returns at most
+    /// <paramref name="limit"/> accounts when given (all of them when null).
+    /// </summary>
+    Task<IReadOnlyList<Account>> ListByOwnerAsync(
+        Guid ownerId,
+        AccountStatus? status,
+        int? limit,
+        int offset,
+        CancellationToken cancellationToken);
+
+    /// <summary>How many customer accounts of one owner match the status filter (all when null).</summary>
+    Task<int> CountByOwnerAsync(Guid ownerId, AccountStatus? status, CancellationToken cancellationToken);
 
     /// <summary>
     /// Locks the given accounts (SELECT ... FOR UPDATE) and returns them with their latest committed state.

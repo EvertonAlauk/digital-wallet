@@ -18,14 +18,36 @@ internal sealed class AccountRepository(WalletDbContext dbContext) : IAccountRep
         return Task.CompletedTask;
     }
 
-    public async Task<IReadOnlyList<Account>> ListByOwnerAsync(Guid ownerId, int limit, CancellationToken cancellationToken) =>
-        await dbContext.Accounts
-            .AsNoTracking()
-            .Where(account => account.OwnerId == ownerId && account.Kind == AccountKind.Customer)
+    public async Task<IReadOnlyList<Account>> ListByOwnerAsync(
+        Guid ownerId,
+        AccountStatus? status,
+        int? limit,
+        int offset,
+        CancellationToken cancellationToken)
+    {
+        var query = OwnedAccounts(ownerId, status)
             .OrderByDescending(account => account.CreatedAt)
             .ThenBy(account => account.Id)
-            .Take(limit)
-            .ToListAsync(cancellationToken);
+            .Skip(offset);
+
+        if (limit is { } take)
+        {
+            query = query.Take(take);
+        }
+
+        return await query.AsNoTracking().ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountByOwnerAsync(Guid ownerId, AccountStatus? status, CancellationToken cancellationToken) =>
+        OwnedAccounts(ownerId, status).CountAsync(cancellationToken);
+
+    private IQueryable<Account> OwnedAccounts(Guid ownerId, AccountStatus? status)
+    {
+        var query = dbContext.Accounts
+            .Where(account => account.OwnerId == ownerId && account.Kind == AccountKind.Customer);
+
+        return status is { } wanted ? query.Where(account => account.Status == wanted) : query;
+    }
 
     public async Task<IReadOnlyDictionary<Guid, Account>> GetByIdsForUpdateAsync(
         IReadOnlyCollection<Guid> ids,

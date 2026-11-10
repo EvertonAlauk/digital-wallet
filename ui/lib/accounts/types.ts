@@ -9,8 +9,12 @@ export interface Account {
   createdAt: string;
 }
 
+/** One page of accounts. totalCount counts every account that matches the filter, across all pages. */
 export interface AccountList {
   items: Account[];
+  totalCount: number;
+  limit: number;
+  offset: number;
 }
 
 /** Outcome of a request that the API accepts and processes in the background. */

@@ -3,6 +3,7 @@ using DigitalWallet.Application.Operations;
 using DigitalWallet.Application.Outbox;
 using DigitalWallet.Application.Ports;
 using DigitalWallet.Domain.Entities;
+using DigitalWallet.Domain.Enums;
 
 namespace DigitalWallet.Testing.InMemory;
 
@@ -220,10 +221,21 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork, IDisposable
         public Task AddAsync(Account account, CancellationToken cancellationToken) =>
             unitOfWork.AddAccountAsync(account, cancellationToken);
 
-        public Task<IReadOnlyList<Account>> ListByOwnerAsync(Guid ownerId, int limit, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<Account>> ListByOwnerAsync(
+            Guid ownerId,
+            AccountStatus? status,
+            int? limit,
+            int offset,
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(unitOfWork._database.ListAccountsByOwner(ownerId, limit));
+            return Task.FromResult(unitOfWork._database.ListAccountsByOwner(ownerId, status, limit, offset));
+        }
+
+        public Task<int> CountByOwnerAsync(Guid ownerId, AccountStatus? status, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(unitOfWork._database.CountAccountsByOwner(ownerId, status));
         }
 
         public Task<IReadOnlyDictionary<Guid, Account>> GetByIdsForUpdateAsync(

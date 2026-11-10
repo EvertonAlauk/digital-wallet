@@ -2,6 +2,7 @@ using DigitalWallet.Application.Accounts;
 using DigitalWallet.Application.Operations;
 using DigitalWallet.Application.Settlement;
 using DigitalWallet.Application.Statements;
+using DigitalWallet.Domain.Enums;
 using DigitalWallet.Testing.Fakes;
 using DigitalWallet.Testing.InMemory;
 
@@ -45,11 +46,34 @@ internal sealed class WalletHarness
         return useCase.ExecuteAsync(new CreateAccountCommand(ownerId, name), CancellationToken.None);
     }
 
-    public Task<IReadOnlyList<AccountView>> ListAccountsAsync(Guid ownerId, int? limit = null)
+    public async Task<IReadOnlyList<AccountView>> ListAccountsAsync(Guid ownerId, int? limit = null, AccountStatus? status = null) =>
+        (await ListPageAsync(ownerId, limit, status: status)).Items;
+
+    public Task<AccountPage> ListPageAsync(Guid ownerId, int? limit = null, int? offset = null, AccountStatus? status = null)
     {
         var unitOfWork = Database.CreateUnitOfWork();
         var useCase = new ListAccountsUseCase(unitOfWork.Accounts);
-        return useCase.ExecuteAsync(new ListAccountsQuery(ownerId, limit), CancellationToken.None);
+        return useCase.ExecuteAsync(new ListAccountsQuery(ownerId, status, limit, offset), CancellationToken.None);
+    }
+
+    public Task<AccountView> SetActiveAsync(Guid accountId, bool active)
+    {
+        var unitOfWork = Database.CreateUnitOfWork();
+        var useCase = new SetAccountActiveUseCase(unitOfWork.Accounts, unitOfWork);
+        return useCase.ExecuteAsync(new SetAccountActiveCommand(accountId, active), CancellationToken.None);
+    }
+
+    public Task<AccountView> RenameAsync(Guid accountId, string? name)
+    {
+        var unitOfWork = Database.CreateUnitOfWork();
+        var useCase = new RenameAccountUseCase(unitOfWork.Accounts, unitOfWork);
+        return useCase.ExecuteAsync(new RenameAccountCommand(accountId, name), CancellationToken.None);
+    }
+
+    public Task<AccountSummary> SummaryAsync(Guid ownerId)
+    {
+        var unitOfWork = Database.CreateUnitOfWork();
+        return new AccountSummaryUseCase(unitOfWork.Accounts).ExecuteAsync(ownerId, CancellationToken.None);
     }
 
     public Task<AccountView> GetAccountAsync(Guid accountId)
@@ -117,9 +141,9 @@ internal sealed class WalletHarness
         return useCase.ExecuteAsync(new GetStatementQuery(accountId, cursor, limit), CancellationToken.None);
     }
 
-    public async Task<Guid> CreateFundedAccountAsync(decimal amount)
+    public async Task<Guid> CreateFundedAccountAsync(decimal amount, Guid? ownerId = null)
     {
-        var account = await CreateAccountAsync(Guid.NewGuid());
+        var account = await CreateAccountAsync(ownerId ?? Guid.NewGuid());
         if (amount > 0m)
         {
             await DepositAsync(account.Id, amount);

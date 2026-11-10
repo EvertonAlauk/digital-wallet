@@ -13,5 +13,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/**/*.test.{ts,tsx}"],
+    // Tests use 10 accounts per page; the default (5) is covered by its own test.
+    env: { NEXT_PUBLIC_ACCOUNTS_PAGE_SIZE: "10" },
   },
 });

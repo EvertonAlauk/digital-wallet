@@ -1,17 +1,22 @@
 using DigitalWallet.Application.Common;
 using DigitalWallet.Application.Ports;
+using DigitalWallet.Domain.Enums;
 
 namespace DigitalWallet.Application.Accounts;
 
-public sealed record ListAccountsQuery(Guid OwnerId, int? Limit);
+/// <summary>Filters the owner's accounts by status (null means all) and selects one page of them.</summary>
+public sealed record ListAccountsQuery(Guid OwnerId, AccountStatus? Status, int? Limit, int? Offset = null);
 
-/// <summary>Lists the customer accounts of one owner, newest first. Each account keeps its own balance and status.</summary>
+/// <summary>One page of accounts. <see cref="TotalCount"/> counts every account that matches the filter.</summary>
+public sealed record AccountPage(IReadOnlyList<AccountView> Items, int TotalCount, int Limit, int Offset);
+
+/// <summary>Lists the customer accounts of one owner, newest first, one page at a time.</summary>
 public sealed class ListAccountsUseCase(IAccountRepository accounts)
 {
-    public const int DefaultLimit = 50;
+    public const int DefaultLimit = 5;
     public const int MaxLimit = 100;
 
-    public async Task<IReadOnlyList<AccountView>> ExecuteAsync(ListAccountsQuery query, CancellationToken cancellationToken)
+    public async Task<AccountPage> ExecuteAsync(ListAccountsQuery query, CancellationToken cancellationToken)
     {
         var limit = query.Limit ?? DefaultLimit;
         if (limit < 1 || limit > MaxLimit)
@@ -19,7 +24,15 @@ public sealed class ListAccountsUseCase(IAccountRepository accounts)
             throw new RequestValidationException("limit", $"The limit must be between 1 and {MaxLimit}.");
         }
 
-        var found = await accounts.ListByOwnerAsync(query.OwnerId, limit, cancellationToken);
-        return found.Select(AccountView.From).ToList();
+        var offset = query.Offset ?? 0;
+        if (offset < 0)
+        {
+            throw new RequestValidationException("offset", "The offset cannot be negative.");
+        }
+
+        var found = await accounts.ListByOwnerAsync(query.OwnerId, query.Status, limit, offset, cancellationToken);
+        var total = await accounts.CountByOwnerAsync(query.OwnerId, query.Status, cancellationToken);
+
+        return new AccountPage(found.Select(AccountView.From).ToList(), total, limit, offset);
     }
 }

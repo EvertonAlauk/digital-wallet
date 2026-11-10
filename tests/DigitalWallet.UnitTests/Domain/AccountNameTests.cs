@@ -88,3 +88,63 @@ public class AccountNameTests
         account.Status.Should().Be(DigitalWallet.Domain.Enums.AccountStatus.Active);
     }
 }
+
+public class AccountRenameTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public void Rename_ChangesTheNameAndIncrementsTheVersion()
+    {
+        var account = Account.Open(Guid.NewGuid(), Guid.NewGuid(), Now, "Old");
+        var before = account.Version;
+
+        account.Rename("  New name ");
+
+        account.Name.Should().Be("New name");
+        account.Version.Should().Be(before + 1);
+    }
+
+    [Fact]
+    public void Rename_ToTheSameName_DoesNotChangeTheVersion()
+    {
+        var account = Account.Open(Guid.NewGuid(), Guid.NewGuid(), Now, "Same");
+        var before = account.Version;
+
+        account.Rename("Same");
+
+        account.Version.Should().Be(before);
+    }
+
+    [Fact]
+    public void Rename_ToBlank_ClearsTheName()
+    {
+        var account = Account.Open(Guid.NewGuid(), Guid.NewGuid(), Now, "Named");
+
+        account.Rename("   ");
+
+        account.Name.Should().BeNull();
+    }
+
+    [Fact]
+    public void Rename_TooLong_IsRejectedAndKeepsTheName()
+    {
+        var account = Account.Open(Guid.NewGuid(), Guid.NewGuid(), Now, "Kept");
+
+        Action act = () => account.Rename(new string('x', Account.MaxNameLength + 1));
+
+        act.Should().Throw<DigitalWallet.Domain.Exceptions.InvalidAccountNameException>();
+        account.Name.Should().Be("Kept");
+    }
+
+    [Fact]
+    public void Rename_DoesNotChangeTheStatus()
+    {
+        var account = Account.Open(Guid.NewGuid(), Guid.NewGuid(), Now, "Named");
+        account.Block();
+
+        account.Rename("Renamed");
+
+        account.Status.Should().Be(DigitalWallet.Domain.Enums.AccountStatus.Blocked);
+    }
+}

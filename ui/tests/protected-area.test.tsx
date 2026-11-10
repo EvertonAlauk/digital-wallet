@@ -31,7 +31,8 @@ beforeEach(() => {
 
 describe("protected area", () => {
   it("restores the session on load and shows the greeting with the user's name", async () => {
-    const fetchMock = routeFetch({ "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+    const fetchMock = routeFetch({ "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
       "GET /bff/session": () => jsonResponse(200, { user: aliceUser }) });
 
     renderWithAuth(protectedArea());
@@ -42,7 +43,8 @@ describe("protected area", () => {
   });
 
   it("greets with the username when the identity provider has no name", async () => {
-    routeFetch({ "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+    routeFetch({ "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
       "GET /bff/session": () => jsonResponse(200, { user: { ...aliceUser, name: null } }) });
 
     renderWithAuth(protectedArea());
@@ -53,7 +55,8 @@ describe("protected area", () => {
   it("shows the accounts section on the home page", async () => {
     routeFetch({
       "GET /bff/session": () => jsonResponse(200, { user: aliceUser }),
-      "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+      "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
     });
 
     renderWithAuth(protectedArea());
@@ -63,7 +66,8 @@ describe("protected area", () => {
 
   it("sends a visitor without a session to the login page with the current page as returnUrl", async () => {
     navigation.pathname = "/accounts";
-    routeFetch({ "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+    routeFetch({ "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
       "GET /bff/session": () => jsonResponse(401, { title: "Not signed in" }) });
 
     renderWithAuth(protectedArea());
@@ -76,7 +80,8 @@ describe("protected area", () => {
 
   it("signs out: calls the BFF, then goes to the login page without a returnUrl", async () => {
     const fetchMock = routeFetch({
-      "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+      "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
       "GET /bff/session": () => jsonResponse(200, { user: aliceUser }),
       "POST /bff/logout": () => jsonResponse(204),
     });
@@ -92,7 +97,8 @@ describe("protected area", () => {
 
   it("stays signed in and shows an error when the BFF cannot end the session", async () => {
     routeFetch({
-      "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+      "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
       "GET /bff/session": () => jsonResponse(200, { user: aliceUser }),
       "POST /bff/logout": () => jsonResponse(500, { title: "Server error" }),
     });
@@ -136,7 +142,8 @@ describe("cross-tab session sync", () => {
   });
 
   it("signs this tab out when another tab signs out", async () => {
-    routeFetch({ "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+    routeFetch({ "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
       "GET /bff/session": () => jsonResponse(200, { user: aliceUser }) });
     renderWithAuth(protectedArea());
     await screen.findByRole("heading", { name: /Hello/ });
@@ -149,7 +156,8 @@ describe("cross-tab session sync", () => {
   it("asks the BFF again when another tab signs in, instead of trusting the message", async () => {
     let signedIn = false;
     const fetchMock = routeFetch({
-      "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+      "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
       "GET /bff/session": () => (signedIn ? jsonResponse(200, { user: aliceUser }) : jsonResponse(401, {})),
     });
     renderWithAuth(<span>signed-out page</span>);
@@ -162,7 +170,8 @@ describe("cross-tab session sync", () => {
   });
 
   it("ignores messages that are not session messages", async () => {
-    const fetchMock = routeFetch({ "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+    const fetchMock = routeFetch({ "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
       "GET /bff/session": () => jsonResponse(200, { user: aliceUser }) });
     renderWithAuth(protectedArea());
     await screen.findByRole("heading", { name: /Hello/ });

@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { AccountDetail } from "@/components/accounts/account-detail";
+import { BackLink } from "@/components/accounts/back-link";
 import { isAccountId } from "@/lib/accounts/ids";
 
 /**
@@ -18,7 +18,7 @@ function AccountPageContent() {
       <section>
         <h1>Account not found</h1>
         <p>Choose an account from your accounts list.</p>
-        <Link href="/">Back to your accounts</Link>
+        <BackLink />
       </section>
     );
   }

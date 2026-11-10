@@ -18,11 +18,11 @@ const untitled = { ...savings, id: "5a710000-0000-4000-8000-000000000002", name:
 
 describe("AccountsPanel", () => {
   it("lists the user's accounts with their names and balances, each linking to its page", async () => {
-    routeFetch({ "GET /api/accounts": () => jsonResponse(200, { items: [savings, untitled] }) });
+    routeFetch({ "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }), "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [savings, untitled] }) });
 
     renderWithAuth(<AccountsPanel />);
 
-    const list = await screen.findByRole("list", { name: "Accounts" });
+    const list = await screen.findByRole("list", { name: "Active accounts" });
     const items = within(list).getAllByRole("link");
     expect(items[0]).toHaveAttribute("href", `/account?id=${savings.id}`);
     expect(items[0]).toHaveTextContent("Savings");
@@ -31,15 +31,15 @@ describe("AccountsPanel", () => {
   });
 
   it("shows an empty state for a user with no accounts", async () => {
-    routeFetch({ "GET /api/accounts": () => jsonResponse(200, { items: [] }) });
+    routeFetch({ "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }), "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }) });
 
     renderWithAuth(<AccountsPanel />);
 
-    expect(await screen.findByText("You have no accounts yet. Create one to get started.")).toBeInTheDocument();
+    expect(await screen.findByText("You have no active accounts. Create one to get started.")).toBeInTheDocument();
   });
 
   it("shows an error when the accounts cannot be loaded", async () => {
-    routeFetch({ "GET /api/accounts": () => jsonResponse(500, { title: "Server error" }) });
+    routeFetch({ "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }), "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(500, { title: "Server error" }) });
 
     renderWithAuth(<AccountsPanel />);
 
@@ -49,7 +49,8 @@ describe("AccountsPanel", () => {
   it("opens an account with the typed name, sends an Idempotency-Key, and refreshes the list", async () => {
     let accounts = [savings];
     const fetchMock = routeFetch({
-      "GET /api/accounts": () => jsonResponse(200, { items: accounts }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
+      "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: accounts }),
       "POST /api/accounts": () => {
         accounts = [{ ...untitled, name: "Groceries" }, ...accounts];
         return jsonResponse(201, accounts[0]);
@@ -71,11 +72,12 @@ describe("AccountsPanel", () => {
 
   it("creates an account without a name when the field is left blank", async () => {
     const fetchMock = routeFetch({
-      "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
+      "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
       "POST /api/accounts": () => jsonResponse(201, untitled),
     });
     renderWithAuth(<AccountsPanel />);
-    await screen.findByText("You have no accounts yet. Create one to get started.");
+    await screen.findByText("You have no active accounts. Create one to get started.");
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Create account" }));
 
@@ -85,9 +87,9 @@ describe("AccountsPanel", () => {
   });
 
   it("refuses a name longer than 60 characters without calling the API", async () => {
-    const fetchMock = routeFetch({ "GET /api/accounts": () => jsonResponse(200, { items: [] }) });
+    const fetchMock = routeFetch({ "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }), "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }) });
     renderWithAuth(<AccountsPanel />);
-    await screen.findByText("You have no accounts yet. Create one to get started.");
+    await screen.findByText("You have no active accounts. Create one to get started.");
 
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Account name (optional)"), "x".repeat(61));
@@ -99,11 +101,12 @@ describe("AccountsPanel", () => {
 
   it("shows the API's reason when opening the account fails", async () => {
     routeFetch({
-      "GET /api/accounts": () => jsonResponse(200, { items: [] }),
+      "GET /api/accounts/summary": () => jsonResponse(200, { totals: [], activeCount: 0, inactiveCount: 0 }),
+      "GET /api/accounts?limit=10&offset=0&status=active": () => jsonResponse(200, { totalCount: 0, limit: 10, offset: 0, items: [] }),
       "POST /api/accounts": () => jsonResponse(422, { title: "Business rule violation", detail: "Name has a control character." }),
     });
     renderWithAuth(<AccountsPanel />);
-    await screen.findByText("You have no accounts yet. Create one to get started.");
+    await screen.findByText("You have no active accounts. Create one to get started.");
 
     await userEvent.setup().click(screen.getByRole("button", { name: "Create account" }));
 

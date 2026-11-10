@@ -102,6 +102,8 @@ services:
     environment:
       # The browser only talks to this server. /bff/* and /api/* are rewritten to the BFF on the internal network.
       BFF_URL: "http://bff:8080"
+      # Accounts per page on the home and inactive accounts pages (default 5).
+      NEXT_PUBLIC_ACCOUNTS_PAGE_SIZE: "${NEXT_PUBLIC_ACCOUNTS_PAGE_SIZE:-5}"
       # Changes made on the Windows host may not reach the container through the volume, so the dev server polls.
       WATCHPACK_POLLING: "true"
     volumes:

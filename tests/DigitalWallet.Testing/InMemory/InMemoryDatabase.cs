@@ -122,17 +122,32 @@ public sealed class InMemoryDatabase
     }
 
     /// <summary>Returns copies of the committed customer accounts of one owner, newest first.</summary>
-    public IReadOnlyList<Account> ListAccountsByOwner(Guid ownerId, int limit)
+    public int CountAccountsByOwner(Guid ownerId, AccountStatus? status)
     {
         lock (_gate)
         {
-            return _accounts.Values
+            return _accounts.Values.Count(account =>
+                account.OwnerId == ownerId && account.Kind == AccountKind.Customer && (status is null || account.Status == status));
+        }
+    }
+
+    public IReadOnlyList<Account> ListAccountsByOwner(Guid ownerId, AccountStatus? status, int? limit, int offset)
+    {
+        lock (_gate)
+        {
+            IEnumerable<Account> query = _accounts.Values
                 .Where(account => account.OwnerId == ownerId && account.Kind == AccountKind.Customer)
+                .Where(account => status is null || account.Status == status)
                 .OrderByDescending(account => account.CreatedAt)
                 .ThenBy(account => account.Id)
-                .Take(limit)
-                .Select(Copy)
-                .ToList();
+                .Skip(offset);
+
+            if (limit is { } take)
+            {
+                query = query.Take(take);
+            }
+
+            return query.Select(Copy).ToList();
         }
     }
 

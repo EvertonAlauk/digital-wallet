@@ -61,8 +61,37 @@ public sealed class ApiClient
     public Task<HttpResponseMessage> PostAccountAsync(string? name) =>
         _http.PostAsJsonAsync("/accounts", new CreateAccountRequest(name));
 
-    public Task<HttpResponseMessage> ListAccountsAsync(int? limit = null) =>
-        _http.GetAsync(limit is null ? "/accounts" : $"/accounts?limit={limit}");
+    public Task<HttpResponseMessage> ListAccountsAsync(int? limit = null, string? status = null, int? offset = null)
+    {
+        var query = new List<string>();
+        if (limit is not null)
+        {
+            query.Add($"limit={limit}");
+        }
+
+        if (offset is not null)
+        {
+            query.Add($"offset={offset}");
+        }
+
+        if (status is not null)
+        {
+            query.Add($"status={status}");
+        }
+
+        return _http.GetAsync(query.Count == 0 ? "/accounts" : "/accounts?" + string.Join("&", query));
+    }
+
+    public Task<HttpResponseMessage> GetAccountSummaryAsync() => _http.GetAsync("/accounts/summary");
+
+    public Task<HttpResponseMessage> RenameAccountAsync(Guid accountId, string? name) =>
+        _http.PatchAsJsonAsync($"/accounts/{accountId}", new UpdateAccountRequest(name));
+
+    public Task<HttpResponseMessage> DeactivateAccountAsync(Guid accountId) =>
+        _http.PostAsync($"/accounts/{accountId}/deactivate", content: null);
+
+    public Task<HttpResponseMessage> ActivateAccountAsync(Guid accountId) =>
+        _http.PostAsync($"/accounts/{accountId}/activate", content: null);
 
     public Task<HttpResponseMessage> GetAccountAsync(Guid accountId) =>
         _http.GetAsync($"/accounts/{accountId}");

@@ -37,7 +37,7 @@ public sealed class Account
     public Guid OwnerId { get; }
 
     /// <summary>Name chosen by the owner, or null when none was given.</summary>
-    public string? Name { get; }
+    public string? Name { get; private set; }
 
     public AccountKind Kind { get; }
 
@@ -116,6 +116,22 @@ public sealed class Account
     public void Block() => ChangeStatus(AccountStatus.Blocked);
 
     public void Unblock() => ChangeStatus(AccountStatus.Active);
+
+    /// <summary>
+    /// Changes the account name (blank clears it). Renaming changes the stored row, so it increments <see cref="Version"/>.
+    /// The name is checked with <see cref="NormalizeName"/>.
+    /// </summary>
+    public void Rename(string? name)
+    {
+        var normalized = NormalizeName(name);
+        if (normalized == Name)
+        {
+            return;
+        }
+
+        Name = normalized;
+        Version++;
+    }
 
     private void ChangeStatus(AccountStatus newStatus)
     {
